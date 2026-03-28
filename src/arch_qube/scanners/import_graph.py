@@ -25,6 +25,9 @@ def build_import_graph(
 
     for ext in profile.file_extensions:
         for fpath in source_root.rglob(f"*{ext}"):
+            # Skip test/spec/mock files — they legitimately import Impl
+            if _is_test_file(fpath.name):
+                continue
             rel = str(fpath.relative_to(source_root))
             src_layer = profile.classify_file(rel)
             imports = _parse_file_imports(fpath, profile)
@@ -149,6 +152,12 @@ def _parse_file_imports(
 
             results.append((i, target))
     return results
+
+
+def _is_test_file(filename: str) -> bool:
+    """Check if file is a test/spec/mock file."""
+    lower = filename.lower()
+    return any(p in lower for p in (".spec.", ".test.", "_test.", "_spec.", "mock.", "stub.", "fixture."))
 
 
 def _find_source_root(fpath: Path, source_root_pattern: str) -> Path | None:
