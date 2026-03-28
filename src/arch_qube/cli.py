@@ -205,3 +205,63 @@ def _print_table(report):
         )
 
     console.print(table)
+
+
+_PRE_COMMIT_HOOK = """\
+#!/bin/sh
+# Architecture Qube pre-commit hook
+arch-qube scan . --framework {framework} --no-ai --ci --diff-only
+"""
+
+_ARCH_QUBE_CONFIG = """\
+# arch-qube.yaml — project-level configuration
+framework: {framework}
+threshold: 95
+# rules_dir: ./custom-rules    # uncomment to add custom rules
+# no_ai: true                  # uncomment to disable AI analysis
+"""
+
+FRAMEWORKS = [
+    "angular", "react", "vue",
+    "ios", "android", "harmonyos", "windows",
+    "springboot", "python", "go", "rust", "nodejs",
+    "stm32", "esp32",
+]
+
+
+@main.command()
+@click.option("--framework", "-f", required=True,
+              type=click.Choice(FRAMEWORKS, case_sensitive=False),
+              help="Framework profile")
+@click.option("--hook", is_flag=True, help="Also install git pre-commit hook")
+def init(framework: str, hook: bool):
+    """Initialize Architecture Qube in a project."""
+    # Write arch-qube.yaml
+    config_path = Path("arch-qube.yaml")
+    config_path.write_text(_ARCH_QUBE_CONFIG.format(framework=framework))
+    console.print(f"[green]Created[/green] {config_path}")
+
+    # Add to .gitignore
+    gitignore = Path(".gitignore")
+    if gitignore.exists():
+        content = gitignore.read_text()
+        if "arch-qube-reports" not in content:
+            with open(gitignore, "a") as f:
+                f.write("\n# Architecture Qube\narch-qube-reports/\n.arch-qube-cache/\n")
+            console.print(f"[green]Updated[/green] .gitignore")
+    else:
+        gitignore.write_text("arch-qube-reports/\n.arch-qube-cache/\n")
+        console.print(f"[green]Created[/green] .gitignore")
+
+    # Install pre-commit hook
+    if hook:
+        hook_dir = Path(".git/hooks")
+        if hook_dir.exists():
+            hook_path = hook_dir / "pre-commit"
+            hook_path.write_text(_PRE_COMMIT_HOOK.format(framework=framework))
+            hook_path.chmod(0o755)
+            console.print(f"[green]Installed[/green] pre-commit hook ({framework})")
+        else:
+            console.print("[yellow]Warning:[/yellow] .git/hooks not found — not a git repo?")
+
+    console.print(f"\n[bold]Ready![/bold] Run: arch-qube scan . -f {framework}")
