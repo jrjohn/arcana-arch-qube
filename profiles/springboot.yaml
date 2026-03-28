@@ -1,0 +1,51 @@
+framework: springboot
+platform: backend
+category: backend
+
+source_roots:
+  - "src/main/java"
+  - "src/main/kotlin"
+
+file_extensions: [".java", ".kt"]
+
+layers:
+  - name: controller
+    paths: ["controller/"]
+  - name: service
+    paths: ["service/"]
+  - name: repository
+    paths: ["repository/"]
+  - name: dao
+    paths: ["dao/"]
+  - name: domain
+    paths: ["domain/", "model/", "entity/"]
+    is_shared: true
+  - name: config
+    paths: ["config/", "configuration/"]
+    is_shared: true
+
+allowed_dependencies:
+  controller: [service, domain, config]
+  service: [repository, domain, config]
+  repository: [dao, domain, config]
+  dao: [domain, config]
+
+import_pattern: "^import\\s+(?:static\\s+)?([a-zA-Z0-9_.]+);"
+
+di_container_files:
+  - "config/**"
+  - "configuration/**"
+  - "**/*Module.java"
+  - "**/*Module.kt"
+  - "**/*Config.java"
+  - "**/*Config.kt"
+
+naming:
+  service_interface: "{Name}Service.java"
+  service_impl: "{Name}ServiceImpl.java"
+  repository_interface: "{Name}Repository.java"
+  repository_impl: "{Name}RepositoryImpl.java"
+  dao_interface: "{Name}Dao.java"
+  dao_impl: "{Name}DaoImpl.java"
+  dto: "{Name}Dto.java"
+  mapper: "{Name}Mapper.java"

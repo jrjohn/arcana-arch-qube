@@ -1,0 +1,17 @@
+id: interface-impl-colocation
+name: "Interface/Impl Colocation"
+description: >
+  impl/ must be a subdirectory of the interface's directory.
+  Proximity principle — find interface, find impl.
+category: common
+severity: major
+weight: 5
+
+ast_checks:
+  - type: file_structure
+    check: "impl_in_subdir"
+    description: "Implementation files must be inside impl/ subdirectory"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

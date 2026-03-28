@@ -1,0 +1,21 @@
+id: controller-service-repo-dao
+name: "Backend Layer Chain"
+description: >
+  Backend must follow Controller -> Service -> Repository -> DAO chain.
+  All four layer directories must exist.
+category: backend
+severity: critical
+weight: 5
+applies_to: [springboot, python, go, rust, nodejs]
+
+ast_checks:
+  - type: file_structure
+    check: "layer_dirs_exist"
+    description: "All backend layer directories must exist"
+  - type: import_direction
+    check: "no_upward_imports"
+    description: "No reverse imports in backend layers"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

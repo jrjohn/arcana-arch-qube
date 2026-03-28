@@ -1,0 +1,17 @@
+id: impl-import-restriction
+name: "Only DI Container Imports Impl"
+description: >
+  Only DI/IoC container files may import *Impl classes.
+  All other code must depend on interfaces only.
+category: common
+severity: critical
+weight: 8
+
+ast_checks:
+  - type: import_restriction
+    check: "impl_import_only_di"
+    description: "Non-DI files must not import implementation classes"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

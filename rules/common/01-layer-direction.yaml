@@ -1,0 +1,17 @@
+id: layer-direction
+name: "Layer Direction Enforcement"
+description: >
+  Dependencies must only flow downward through architecture layers.
+  No reverse dependencies and no layer-skipping.
+category: common
+severity: critical
+weight: 15
+
+ast_checks:
+  - type: import_direction
+    check: "no_upward_imports"
+    description: "No upward imports in layer hierarchy"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

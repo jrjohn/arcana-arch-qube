@@ -1,0 +1,17 @@
+id: impl-naming
+name: "Implementation Naming Convention"
+description: >
+  Implementation class name = InterfaceName + "Impl" suffix.
+  Files in impl/ directories must follow this convention.
+category: common
+severity: minor
+weight: 3
+
+ast_checks:
+  - type: naming
+    check: "impl_naming_convention"
+    description: "Files in impl/ must have Impl suffix"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

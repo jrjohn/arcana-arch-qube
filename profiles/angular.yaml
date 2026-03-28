@@ -1,0 +1,40 @@
+framework: angular
+platform: web
+category: client
+
+source_roots:
+  - "src/app"
+  - "projects/*/src/app"
+
+file_extensions: [".ts"]
+
+layers:
+  - name: presentation
+    paths: ["presentation/"]
+  - name: domain
+    paths: ["domain/"]
+  - name: data
+    paths: ["data/"]
+  - name: core
+    paths: ["core/"]
+    is_shared: true
+
+allowed_dependencies:
+  presentation: [domain, core]
+  domain: [core]
+  data: [domain, core]
+
+import_pattern: "import .* from ['\"](.+?)['\"]"
+
+di_container_files:
+  - "core/di/**"
+  - "**/*.module.ts"
+  - "app.config.ts"
+
+naming:
+  service_interface: "{name}.service.ts"
+  service_impl: "{name}.service.impl.ts"
+  viewmodel: "{name}.view-model.ts"
+  repository: "{name}.repository.ts"
+  dto: "{name}.dto.ts"
+  mapper: "{name}.mapper.ts"

@@ -1,0 +1,18 @@
+id: controller-no-dao
+name: "Controller Cannot Use DAO"
+description: >
+  Controller must not directly import or use DAO classes.
+  Controller -> Service -> Repository -> DAO, no skipping.
+category: backend
+severity: critical
+weight: 4
+applies_to: [springboot, python, go, rust, nodejs]
+
+ast_checks:
+  - type: import_direction
+    check: "no_skip_imports"
+    description: "Controller cannot skip layers to access DAO"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

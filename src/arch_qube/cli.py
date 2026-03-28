@@ -1,0 +1,145 @@
+"""CLI entry point for arch-qube."""
+from __future__ import annotations
+import sys
+from pathlib import Path
+
+import click
+from rich.console import Console
+from rich.table import Table
+
+from arch_qube.rules.loader import load_rules
+from arch_qube.profiles.loader import load_profile
+from arch_qube.scanner import run_ast_scan
+from arch_qube.scoring.engine import build_report
+from arch_qube.reporters.json_reporter import generate_json
+from arch_qube.reporters.markdown_reporter import generate_markdown
+
+console = Console()
+
+# Resolve bundled rules/profiles directories
+_PKG_ROOT = Path(__file__).parent.parent.parent  # repo root
+
+
+@click.group()
+@click.version_option(version="0.1.0")
+def main():
+    """Architecture Qube — AI-powered Architecture Quality Gate."""
+    pass
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True), default=".")
+@click.option("--framework", "-f", required=True, help="Framework profile name")
+@click.option("--rules", "rules_dir", type=click.Path(exists=True), default=None,
+              help="Rules directory (default: bundled)")
+@click.option("--profiles", "profiles_dir", type=click.Path(exists=True), default=None,
+              help="Profiles directory (default: bundled)")
+@click.option("--threshold", type=float, default=95.0, help="Pass/fail score (default: 95)")
+@click.option("--output", "-o", "output_dir", type=click.Path(), default="arch-qube-reports",
+              help="Output directory")
+@click.option("--format", "formats", default="json,markdown", help="Output formats (comma-separated)")
+@click.option("--ci", is_flag=True, help="CI mode: exit 1 on fail, minimal output")
+@click.option("--no-ai", is_flag=True, help="Skip AI semantic analysis")
+def scan(
+    path: str,
+    framework: str,
+    rules_dir: str | None,
+    profiles_dir: str | None,
+    threshold: float,
+    output_dir: str,
+    formats: str,
+    ci: bool,
+    no_ai: bool,
+):
+    """Scan a project for architecture compliance."""
+    source_root = Path(path).resolve()
+    out_path = Path(output_dir)
+    out_path.mkdir(parents=True, exist_ok=True)
+
+    # Resolve rule and profile directories
+    r_dir = Path(rules_dir) if rules_dir else _PKG_ROOT / "rules"
+    p_dir = Path(profiles_dir) if profiles_dir else _PKG_ROOT / "profiles"
+
+    # Load profile
+    try:
+        profile = load_profile(p_dir, framework)
+    except FileNotFoundError as e:
+        console.print(f"[red]Error:[/red] {e}")
+        sys.exit(2)
+
+    # Load rules
+    rules = load_rules(r_dir)
+    if not rules:
+        console.print("[red]Error:[/red] No rules found")
+        sys.exit(2)
+
+    # Determine effective source root
+    effective_root = source_root
+    for sr in profile.source_roots:
+        candidate = source_root / sr
+        if candidate.exists():
+            effective_root = candidate
+            break
+
+    if not ci:
+        console.print(f"\n[bold]Architecture Qube[/bold] scanning [cyan]{framework}[/cyan]")
+        console.print(f"Source: {effective_root}")
+        console.print(f"Rules: {len(rules)} loaded\n")
+
+    # Run AST scan
+    results = run_ast_scan(effective_root, profile, rules)
+
+    # Count files
+    file_count = sum(
+        1
+        for ext in profile.file_extensions
+        for _ in effective_root.rglob(f"*{ext}")
+    )
+
+    # Build report
+    report = build_report(results, framework, str(effective_root), file_count, threshold)
+
+    # Display results
+    if not ci:
+        _print_table(report)
+
+    # Write outputs
+    fmt_list = [f.strip() for f in formats.split(",")]
+    if "json" in fmt_list:
+        (out_path / "arch-qube.json").write_text(generate_json(report))
+    if "markdown" in fmt_list:
+        (out_path / "arch-qube.md").write_text(generate_markdown(report))
+
+    # CI exit code
+    if report.passed:
+        if not ci:
+            console.print(f"\n[green bold]PASS[/green bold] — {report.total_score}/100 ({report.grade})")
+        sys.exit(0)
+    else:
+        if not ci:
+            console.print(f"\n[red bold]FAIL[/red bold] — {report.total_score}/100 ({report.grade})")
+            console.print(f"  Threshold: {threshold}, Violations: {report.total_violations}")
+        sys.exit(1)
+
+
+def _print_table(report):
+    """Print a rich table of results."""
+    table = Table(title="Architecture Qube Results")
+    table.add_column("Rule", style="cyan")
+    table.add_column("Severity", justify="center")
+    table.add_column("Compliance", justify="right")
+    table.add_column("Status", justify="center")
+
+    for r in sorted(report.rule_results, key=lambda x: x.compliance):
+        sev_color = {"critical": "red", "major": "yellow", "minor": "blue", "info": "dim"}.get(
+            r.severity.value, "white"
+        )
+        status = "[green]PASS[/green]" if r.passed else "[red]FAIL[/red]"
+        table.add_row(
+            r.rule_name,
+            f"[{sev_color}]{r.severity.value}[/{sev_color}]",
+            f"{r.compliance:.0f}%",
+            status,
+        )
+
+    console.print(table)
