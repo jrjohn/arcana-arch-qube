@@ -1,0 +1,28 @@
+framework: esp32
+platform: embedded
+category: client
+
+source_roots: ["main", "components"]
+file_extensions: [".hpp", ".cpp", ".h"]
+
+layers:
+  - name: service
+    paths: ["Service/", "service/"]
+  - name: driver
+    paths: ["Driver/", "driver/"]
+  - name: observable
+    paths: ["Observable/", "observable/"]
+    is_shared: true
+  - name: core
+    paths: ["main/"]
+    is_shared: true
+
+allowed_dependencies:
+  service: [driver, observable, core]
+  driver: [observable, core]
+
+import_pattern: "#include\\s+[\"<]([^\"'>]+)[\"'>]"
+
+di_container_files:
+  - "**/Controller.cpp"
+  - "**/app_main.cpp"

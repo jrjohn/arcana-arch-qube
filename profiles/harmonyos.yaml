@@ -1,0 +1,30 @@
+framework: harmonyos
+platform: mobile
+category: client
+
+source_roots: ["entry/src/main/ets"]
+file_extensions: [".ets", ".ts"]
+
+layers:
+  - name: presentation
+    paths: ["presentation/", "pages/", "components/"]
+  - name: domain
+    paths: ["domain/"]
+  - name: data
+    paths: ["data/"]
+  - name: core
+    paths: ["core/"]
+    is_shared: true
+
+allowed_dependencies:
+  presentation: [domain, core]
+  domain: [core]
+  data: [domain, core]
+
+import_pattern: "import .* from ['\"](.+?)['\"]"
+
+di_container_files:
+  - "core/di/**"
+
+naming:
+  viewmodel: "{Name}ViewModel.ets"

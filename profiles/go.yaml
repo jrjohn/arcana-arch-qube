@@ -1,0 +1,38 @@
+framework: go
+platform: backend
+category: backend
+
+source_roots: ["internal", "pkg"]
+file_extensions: [".go"]
+
+layers:
+  - name: controller
+    paths: ["handler/", "controller/", "api/"]
+  - name: service
+    paths: ["service/", "usecase/"]
+  - name: repository
+    paths: ["repository/"]
+  - name: dao
+    paths: ["dao/", "store/"]
+  - name: domain
+    paths: ["domain/", "entity/", "model/"]
+    is_shared: true
+  - name: core
+    paths: ["config/", "pkg/"]
+    is_shared: true
+
+allowed_dependencies:
+  controller: [service, domain, core]
+  service: [repository, domain, core]
+  repository: [dao, domain, core]
+  dao: [domain, core]
+
+import_pattern: "\"([^\"]+)\""
+
+di_container_files:
+  - "**/wire.go"
+  - "**/container.go"
+  - "cmd/**"
+
+naming:
+  service_impl: "{name}_service_impl.go"

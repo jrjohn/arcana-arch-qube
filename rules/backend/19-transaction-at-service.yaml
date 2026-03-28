@@ -1,0 +1,22 @@
+id: transaction-at-service
+name: "Transaction at Service Layer Only"
+description: >
+  @Transactional (or equivalent) must only be at Service layer.
+  Not on Controller (too broad) or DAO (too narrow).
+category: backend
+severity: critical
+weight: 4
+applies_to: [springboot, python, go, rust, nodejs]
+
+ast_checks:
+  - type: annotation_check
+    check: "transaction_placement"
+    description: "Transaction annotations must be on Service layer only"
+    params:
+      annotations: ["@Transactional", "@transaction", "with_transaction"]
+      allowed_layers: ["service"]
+      forbidden_layers: ["controller"]
+
+scoring:
+  method: percentage
+  pass_threshold: 100

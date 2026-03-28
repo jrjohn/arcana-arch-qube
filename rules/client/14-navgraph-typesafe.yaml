@@ -1,0 +1,25 @@
+id: navgraph-typesafe
+name: "Type-Safe NavGraph"
+description: >
+  Navigation must use type-safe NavGraph pattern.
+  No magic strings for route names.
+category: client
+severity: major
+weight: 3
+
+ast_checks:
+  - type: file_structure
+    check: "navgraph_exists"
+    description: "NavGraph definition file must exist"
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Check if navigation in this project uses type-safe route definitions
+      (NavGraph pattern) instead of magic strings.
+      Files: {file_list}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: boolean
+  pass_threshold: 100

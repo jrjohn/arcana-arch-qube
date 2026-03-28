@@ -1,0 +1,33 @@
+framework: vue
+platform: web
+category: client
+
+source_roots: ["src"]
+file_extensions: [".ts", ".vue"]
+
+layers:
+  - name: presentation
+    paths: ["presentation/", "views/", "components/"]
+  - name: domain
+    paths: ["domain/"]
+  - name: data
+    paths: ["data/"]
+  - name: core
+    paths: ["core/"]
+    is_shared: true
+
+allowed_dependencies:
+  presentation: [domain, core]
+  domain: [core]
+  data: [domain, core]
+
+import_pattern: "import .* from ['\"](.+?)['\"]"
+
+di_container_files:
+  - "core/di/**"
+  - "**/container.ts"
+  - "**/inversify.config.ts"
+
+naming:
+  viewmodel: "{name}.view-model.ts"
+  repository: "{name}.repository.ts"

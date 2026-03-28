@@ -1,0 +1,17 @@
+id: view-no-service
+name: "View Cannot Call Service"
+description: >
+  View/Component must not directly call Domain Service.
+  Must go through ViewModel.
+category: client
+severity: critical
+weight: 3
+
+ast_checks:
+  - type: import_restriction
+    check: "view_no_service_import"
+    description: "View files must not import from service/ or domain/"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

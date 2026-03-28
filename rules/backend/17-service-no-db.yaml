@@ -1,0 +1,30 @@
+id: service-no-db
+name: "Service Cannot Access DB Directly"
+description: >
+  Service must not write SQL, ORM queries, or direct DB operations.
+  Must go through Repository interface.
+category: backend
+severity: critical
+weight: 5
+applies_to: [springboot, python, go, rust, nodejs]
+
+ast_checks:
+  - type: pattern_match
+    check: "no_db_in_service"
+    description: "Service files must not contain SQL or ORM query patterns"
+    params:
+      forbidden_patterns:
+        - "@Query"
+        - "nativeQuery"
+        - "SELECT.*FROM"
+        - "INSERT.*INTO"
+        - "UPDATE.*SET"
+        - "DELETE.*FROM"
+        - ".query("
+        - ".execute("
+        - "createQueryBuilder"
+        - "raw_sql"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

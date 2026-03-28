@@ -1,0 +1,25 @@
+id: controller-uses-dto
+name: "Controller Uses DTO"
+description: >
+  Controller input/output must use DTOs, never expose domain Entity.
+  Mapper handles DTO <-> Entity conversion.
+category: backend
+severity: major
+weight: 3
+applies_to: [springboot, python, go, rust, nodejs]
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Check if this Controller uses DTOs for request/response instead
+      of exposing domain Entity directly. Look for:
+      - Method parameters should be *Dto, *Request, *Command types
+      - Return types should be *Dto, *Response types
+      - Mapper usage for conversion
+      File: {file_path}
+      {file_content}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: percentage
+  pass_threshold: 100

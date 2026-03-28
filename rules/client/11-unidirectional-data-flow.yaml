@@ -1,0 +1,27 @@
+id: unidirectional-data-flow
+name: "Unidirectional Data Flow"
+description: >
+  Data must flow: View -> Input -> State Mutation -> Output -> View.
+  Output must never directly mutate state. View must never call Domain.
+category: client
+severity: critical
+weight: 3
+
+ast_checks:
+  - type: import_direction
+    check: "no_upward_imports"
+    description: "View cannot import Service/Domain directly"
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Verify unidirectional data flow in this component/view:
+      View -> Input (action) -> State mutation -> Output (signal/computed) -> View render.
+      Check: Does the View directly mutate state? Does Output trigger Input?
+      File: {file_path}
+      {file_content}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: percentage
+  pass_threshold: 100

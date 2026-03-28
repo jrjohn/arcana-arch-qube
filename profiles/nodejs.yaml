@@ -1,0 +1,38 @@
+framework: nodejs
+platform: backend
+category: backend
+
+source_roots: ["src"]
+file_extensions: [".ts", ".js"]
+
+layers:
+  - name: controller
+    paths: ["controller/", "controllers/", "routes/"]
+  - name: service
+    paths: ["service/", "services/"]
+  - name: repository
+    paths: ["repository/", "repositories/"]
+  - name: dao
+    paths: ["dao/", "datasource/"]
+  - name: domain
+    paths: ["domain/", "models/", "entities/"]
+    is_shared: true
+  - name: core
+    paths: ["core/", "config/", "infrastructure/"]
+    is_shared: true
+
+allowed_dependencies:
+  controller: [service, domain, core]
+  service: [repository, domain, core]
+  repository: [dao, domain, core]
+  dao: [domain, core]
+
+import_pattern: "import .* from ['\"](.+?)['\"]"
+
+di_container_files:
+  - "**/container.ts"
+  - "**/inversify.config.ts"
+  - "**/*.module.ts"
+
+naming:
+  service_impl: "{name}.service.impl.ts"

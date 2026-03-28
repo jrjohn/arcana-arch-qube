@@ -1,0 +1,34 @@
+framework: android
+platform: mobile
+category: client
+
+source_roots: ["app/src/main/java", "app/src/main/kotlin"]
+file_extensions: [".kt", ".java"]
+
+layers:
+  - name: presentation
+    paths: ["presentation/", "ui/"]
+  - name: domain
+    paths: ["domain/"]
+  - name: data
+    paths: ["data/"]
+  - name: core
+    paths: ["core/"]
+    is_shared: true
+
+allowed_dependencies:
+  presentation: [domain, core]
+  domain: [core]
+  data: [domain, core]
+
+import_pattern: "^import\\s+([a-zA-Z0-9_.]+)"
+
+di_container_files:
+  - "**/*Module.kt"
+  - "**/di/**"
+  - "**/hilt/**"
+
+naming:
+  viewmodel: "{Name}ViewModel.kt"
+  service_impl: "{Name}ServiceImpl.kt"
+  repository: "{Name}Repository.kt"

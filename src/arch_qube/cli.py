@@ -13,6 +13,9 @@ from arch_qube.scanner import run_ast_scan
 from arch_qube.scoring.engine import build_report
 from arch_qube.reporters.json_reporter import generate_json
 from arch_qube.reporters.markdown_reporter import generate_markdown
+from arch_qube.reporters.sonar_reporter import generate_sonar_issues
+from arch_qube.reporters.junit_reporter import generate_junit
+from arch_qube.reporters.badge_generator import generate_badge_markdown
 
 console = Console()
 
@@ -109,6 +112,12 @@ def scan(
         (out_path / "arch-qube.json").write_text(generate_json(report))
     if "markdown" in fmt_list:
         (out_path / "arch-qube.md").write_text(generate_markdown(report))
+    if "sonar" in fmt_list:
+        (out_path / "arch-qube-sonar.json").write_text(generate_sonar_issues(report))
+    if "junit" in fmt_list:
+        (out_path / "arch-qube-junit.xml").write_text(generate_junit(report))
+    if "badge" in fmt_list:
+        (out_path / "arch-qube-badge.md").write_text(generate_badge_markdown(report))
 
     # CI exit code
     if report.passed:

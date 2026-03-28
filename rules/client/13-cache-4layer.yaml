@@ -1,0 +1,23 @@
+id: cache-4layer
+name: "4-Layer Progressive Cache"
+description: >
+  Repository must implement Memory -> LRU -> LocalDB -> API cascade.
+category: client
+severity: major
+weight: 3
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Check if this Repository implementation has a 4-layer cache strategy:
+      1. Memory cache (~1ms)
+      2. LRU cache (~2ms)
+      3. Local DB / IndexedDB / Room / SwiftData (~10ms)
+      4. API / Network (~200ms)
+      File: {file_path}
+      {file_content}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: boolean
+  pass_threshold: 100

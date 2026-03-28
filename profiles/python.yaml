@@ -1,0 +1,39 @@
+framework: python
+platform: backend
+category: backend
+
+source_roots: ["app", "src"]
+file_extensions: [".py"]
+
+layers:
+  - name: controller
+    paths: ["controller/", "controllers/", "routes/", "api/"]
+  - name: service
+    paths: ["service/", "services/"]
+  - name: repository
+    paths: ["repository/", "repositories/"]
+  - name: dao
+    paths: ["dao/", "datasource/"]
+  - name: domain
+    paths: ["domain/", "models/", "entities/"]
+    is_shared: true
+  - name: core
+    paths: ["core/", "config/"]
+    is_shared: true
+
+allowed_dependencies:
+  controller: [service, domain, core]
+  service: [repository, domain, core]
+  repository: [dao, domain, core]
+  dao: [domain, core]
+
+import_pattern: "^(?:from|import)\\s+([a-zA-Z0-9_.]+)"
+
+di_container_files:
+  - "**/di_container.py"
+  - "**/container.py"
+  - "**/dependencies.py"
+
+naming:
+  service_impl: "{name}_service_impl.py"
+  repository_impl: "{name}_repository_impl.py"

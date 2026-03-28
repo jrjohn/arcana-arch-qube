@@ -1,0 +1,24 @@
+id: mvvm-ioe-structure
+name: "MVVM I/O/E Structure"
+description: >
+  ViewModel must have distinct segments: inputs (action methods),
+  outputs (readonly state), effects (side-effect emitters).
+category: client
+severity: critical
+weight: 3
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Analyze this ViewModel file for MVVM Input/Output/Effect pattern.
+      Must have:
+      - inputs: action methods (user interactions)
+      - outputs: readonly/computed state
+      - effects: side-effect channels (navigation, toast)
+      File: {file_path}
+      {file_content}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: percentage
+  pass_threshold: 100

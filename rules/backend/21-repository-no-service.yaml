@@ -1,0 +1,17 @@
+id: repository-no-service
+name: "Repository Cannot Call Service"
+description: >
+  Repository must not depend on Service layer. No reverse dependency.
+category: backend
+severity: critical
+weight: 2
+applies_to: [springboot, python, go, rust, nodejs]
+
+ast_checks:
+  - type: import_direction
+    check: "no_upward_imports"
+    description: "Repository cannot import from Service layer"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

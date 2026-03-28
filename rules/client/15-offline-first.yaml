@@ -1,0 +1,22 @@
+id: offline-first
+name: "Offline-First Design"
+description: >
+  Must have offline queue + network resume sync mechanism.
+category: client
+severity: major
+weight: 3
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Check if this project implements offline-first design:
+      - Offline operation queue for pending actions
+      - Network state detection
+      - Automatic sync when network resumes
+      - Local persistence (IndexedDB/Room/SwiftData/CoreData)
+      Files: {file_list}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: boolean
+  pass_threshold: 100

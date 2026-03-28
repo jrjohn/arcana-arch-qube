@@ -1,0 +1,21 @@
+id: security-defense-in-depth
+name: "Defense-in-Depth Security"
+description: >
+  Must have Auth + Sanitization + transport encryption.
+  Multiple layers of protection.
+category: common
+severity: critical
+weight: 5
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Analyze this project structure for defense-in-depth security.
+      Check for: authentication mechanism, input sanitization,
+      CSRF/XSS protection, transport encryption (TLS/HTTPS).
+      Files: {file_list}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: boolean
+  pass_threshold: 100

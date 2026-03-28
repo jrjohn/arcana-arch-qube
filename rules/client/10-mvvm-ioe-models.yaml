@@ -1,0 +1,21 @@
+id: mvvm-ioe-models
+name: "MVVM I/O/E Models Binding"
+description: >
+  Two-way bindable state in models segment (Vue v-model, SwiftUI @Binding).
+category: client
+severity: major
+weight: 3
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Check if this ViewModel properly separates two-way bindable models
+      from readonly outputs. Models should be mutable refs/bindings,
+      outputs should be readonly/computed.
+      File: {file_path}
+      {file_content}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: percentage
+  pass_threshold: 100

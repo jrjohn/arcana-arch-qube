@@ -1,0 +1,34 @@
+framework: ios
+platform: mobile
+category: client
+
+source_roots: ["Sources", "arcana-ios/Sources"]
+file_extensions: [".swift"]
+
+layers:
+  - name: presentation
+    paths: ["Presentation/", "ArcanaPresentation/"]
+  - name: domain
+    paths: ["Domain/", "ArcanaDomain/"]
+  - name: data
+    paths: ["Data/", "ArcanaData/"]
+  - name: core
+    paths: ["Core/", "ArcanaCore/"]
+    is_shared: true
+
+allowed_dependencies:
+  presentation: [domain, core]
+  domain: [core]
+  data: [domain, core]
+
+import_pattern: "import\\s+(\\w+)"
+
+di_container_files:
+  - "**/Dependencies.swift"
+  - "**/DependencyValues+*.swift"
+  - "**/ServiceModule.swift"
+
+naming:
+  viewmodel: "{Name}ViewModel.swift"
+  service_impl: "{Name}ServiceImpl.swift"
+  repository: "{Name}Repository.swift"

@@ -1,0 +1,36 @@
+framework: stm32
+platform: embedded
+category: client
+
+source_roots: ["Targets/stm32f103ze/Services", "Targets/stm32f051c8/Services"]
+file_extensions: [".hpp", ".cpp", ".h"]
+
+layers:
+  - name: presentation
+    paths: ["View/", "view/"]
+  - name: viewmodel
+    paths: ["ViewModel/"]
+  - name: service
+    paths: ["Service/", "service/"]
+  - name: driver
+    paths: ["Driver/", "driver/"]
+  - name: controller
+    paths: ["Controller/", "controller/"]
+    is_shared: true
+  - name: common
+    paths: ["Common/", "command/"]
+    is_shared: true
+
+allowed_dependencies:
+  presentation: [viewmodel, common]
+  viewmodel: [service, common]
+  service: [driver, common]
+  driver: [common]
+  controller: [service, viewmodel, presentation, common]
+
+import_pattern: "#include\\s+[\"<]([^\"'>]+)[\"'>]"
+
+di_container_files:
+  - "**/Controller.cpp"
+  - "**/F103App.cpp"
+  - "**/App.cpp"

@@ -1,0 +1,33 @@
+framework: windows
+platform: desktop
+category: client
+
+source_roots: ["src", "ArcanaWindows"]
+file_extensions: [".cs"]
+
+layers:
+  - name: presentation
+    paths: ["Presentation/", "Views/", "ViewModels/"]
+  - name: domain
+    paths: ["Domain/"]
+  - name: data
+    paths: ["Data/"]
+  - name: core
+    paths: ["Core/"]
+    is_shared: true
+
+allowed_dependencies:
+  presentation: [domain, core]
+  domain: [core]
+  data: [domain, core]
+
+import_pattern: "^using\\s+([a-zA-Z0-9_.]+);"
+
+di_container_files:
+  - "**/ServiceCollection*.cs"
+  - "**/DependencyInjection.cs"
+  - "**/App.xaml.cs"
+
+naming:
+  viewmodel: "{Name}ViewModel.cs"
+  service_impl: "{Name}ServiceImpl.cs"

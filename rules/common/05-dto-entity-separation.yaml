@@ -1,0 +1,26 @@
+id: dto-entity-separation
+name: "DTO/Entity Separation"
+description: >
+  Cross-layer data transfer must use Mapper pattern.
+  Controller uses DTO, Service uses Entity, never expose Entity to API boundary.
+category: common
+severity: major
+weight: 7
+
+ast_checks:
+  - type: import_restriction
+    check: "boundary_uses_dto"
+    description: "Controller/View must not import Entity classes directly"
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Check if this boundary file (Controller/View) exposes domain Entity
+      in its public API instead of using DTOs with Mapper conversion.
+      File: {file_path}
+      {file_content}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: percentage
+  pass_threshold: 100

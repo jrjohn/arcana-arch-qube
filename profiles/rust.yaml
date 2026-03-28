@@ -1,0 +1,35 @@
+framework: rust
+platform: backend
+category: backend
+
+source_roots: ["src"]
+file_extensions: [".rs"]
+
+layers:
+  - name: controller
+    paths: ["handler/", "api/", "routes/"]
+  - name: service
+    paths: ["service/", "usecase/"]
+  - name: repository
+    paths: ["repository/", "repo/"]
+  - name: dao
+    paths: ["dao/", "store/"]
+  - name: domain
+    paths: ["domain/", "entity/", "model/"]
+    is_shared: true
+  - name: core
+    paths: ["config/", "infra/"]
+    is_shared: true
+
+allowed_dependencies:
+  controller: [service, domain, core]
+  service: [repository, domain, core]
+  repository: [dao, domain, core]
+  dao: [domain, core]
+
+import_pattern: "use\\s+(?:crate::)?([a-zA-Z0-9_:]+)"
+
+di_container_files:
+  - "**/main.rs"
+  - "**/lib.rs"
+  - "**/container.rs"

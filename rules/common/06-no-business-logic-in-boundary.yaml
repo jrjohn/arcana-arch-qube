@@ -1,0 +1,29 @@
+id: no-business-logic-in-boundary
+name: "No Business Logic in Boundary"
+description: >
+  Controller/View must not contain business logic.
+  They delegate to Service/ViewModel — orchestration only.
+category: common
+severity: major
+weight: 8
+
+ast_checks:
+  - type: complexity
+    check: "boundary_complexity"
+    description: "Controller/View methods should be simple delegation"
+    params:
+      max_method_lines: 20
+
+ai_checks:
+  - type: semantic_review
+    prompt_template: |
+      Analyze this Controller/View file. Does it contain business logic
+      (conditional branching on domain rules, calculations, validations)
+      that should be in the Service/Domain layer?
+      File: {file_path}
+      {file_content}
+      Respond JSON: {{"compliant": true/false, "violations": [...]}}
+
+scoring:
+  method: percentage
+  pass_threshold: 90
