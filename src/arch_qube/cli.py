@@ -20,7 +20,25 @@ from arch_qube.reporters.badge_generator import generate_badge_markdown
 console = Console()
 
 # Resolve bundled rules/profiles directories
-_PKG_ROOT = Path(__file__).parent.parent.parent  # repo root
+# Try repo root first (dev mode), then fallback to installed package data
+_SRC_ROOT = Path(__file__).parent.parent.parent  # repo root (dev)
+_PKG_DATA = Path(__file__).parent  # installed package dir
+
+def _find_data_dir(name: str) -> Path:
+    """Find rules/ or profiles/ directory."""
+    # Dev mode: repo root
+    candidate = _SRC_ROOT / name
+    if candidate.is_dir():
+        return candidate
+    # Docker /app layout
+    candidate = Path("/app") / name
+    if candidate.is_dir():
+        return candidate
+    # Fallback: relative to CWD
+    candidate = Path.cwd() / name
+    if candidate.is_dir():
+        return candidate
+    return _SRC_ROOT / name  # best guess
 
 
 @click.group()
@@ -66,8 +84,8 @@ def scan(
     out_path.mkdir(parents=True, exist_ok=True)
 
     # Resolve rule and profile directories
-    r_dir = Path(rules_dir) if rules_dir else _PKG_ROOT / "rules"
-    p_dir = Path(profiles_dir) if profiles_dir else _PKG_ROOT / "profiles"
+    r_dir = Path(rules_dir) if rules_dir else _find_data_dir("rules")
+    p_dir = Path(profiles_dir) if profiles_dir else _find_data_dir("profiles")
 
     # Load profile
     try:
