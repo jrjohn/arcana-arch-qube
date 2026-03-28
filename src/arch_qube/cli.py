@@ -43,6 +43,9 @@ def main():
 @click.option("--format", "formats", default="json,markdown", help="Output formats (comma-separated)")
 @click.option("--ci", is_flag=True, help="CI mode: exit 1 on fail, minimal output")
 @click.option("--no-ai", is_flag=True, help="Skip AI semantic analysis")
+@click.option("--diff-only", is_flag=True, help="Only scan changed files (git diff)")
+@click.option("--base-branch", default="main", help="Base branch for diff (default: main)")
+@click.option("--api-key", envvar="ANTHROPIC_API_KEY", default=None, help="Claude API key")
 def scan(
     path: str,
     framework: str,
@@ -53,6 +56,9 @@ def scan(
     formats: str,
     ci: bool,
     no_ai: bool,
+    diff_only: bool,
+    base_branch: str,
+    api_key: str | None,
 ):
     """Scan a project for architecture compliance."""
     source_root = Path(path).resolve()
@@ -89,8 +95,47 @@ def scan(
         console.print(f"Source: {effective_root}")
         console.print(f"Rules: {len(rules)} loaded\n")
 
+    # Diff mode: only scan changed files
+    changed_files = None
+    if diff_only:
+        from arch_qube.ai.diff_extractor import get_changed_files
+        changed_files = get_changed_files(
+            effective_root, base_branch, profile.file_extensions
+        )
+        if not ci:
+            console.print(f"Diff mode: {len(changed_files)} changed file(s)\n")
+
     # Run AST scan
     results = run_ast_scan(effective_root, profile, rules)
+
+    # Run AI scan (unless --no-ai)
+    ai_stats = None
+    if not no_ai and api_key:
+        from arch_qube.ai.analyzer import run_ai_scan
+        if not ci:
+            console.print("[dim]Running AI semantic analysis...[/dim]")
+        ai_results, ai_stats = run_ai_scan(
+            effective_root, profile, rules,
+            changed_files=changed_files,
+            api_key=api_key,
+        )
+        # Merge AI results: update existing rules or add new
+        ast_rule_ids = {r.rule_id for r in results}
+        for ai_r in ai_results:
+            if ai_r.rule_id in ast_rule_ids:
+                # Merge violations into existing AST result
+                for existing in results:
+                    if existing.rule_id == ai_r.rule_id:
+                        existing.violations.extend(ai_r.violations)
+                        if ai_r.violations:
+                            violating = len(set(v.file for v in existing.violations))
+                            if existing.files_checked > 0:
+                                existing.compliance = round(
+                                    ((existing.files_checked - violating) / existing.files_checked) * 100.0, 1
+                                )
+                        break
+            else:
+                results.append(ai_r)
 
     # Count files
     file_count = sum(
@@ -105,6 +150,14 @@ def scan(
     # Display results
     if not ci:
         _print_table(report)
+
+    # Show AI stats
+    if ai_stats and not ci and ai_stats.api_calls > 0:
+        console.print(
+            f"\n[dim]AI: {ai_stats.api_calls} API calls, "
+            f"{ai_stats.cache_hits} cache hits, "
+            f"{ai_stats.input_tokens + ai_stats.output_tokens} tokens[/dim]"
+        )
 
     # Write outputs
     fmt_list = [f.strip() for f in formats.split(",")]
