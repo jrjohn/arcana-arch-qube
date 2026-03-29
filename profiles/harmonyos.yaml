@@ -25,6 +25,8 @@ import_pattern: "import .* from ['\"](.+?)['\"]"
 
 di_container_files:
   - "core/di/**"
+  - "core/http/**"
+  - "core/sync/**"
 
 naming:
   viewmodel: "{Name}ViewModel.ets"

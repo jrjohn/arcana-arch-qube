@@ -50,7 +50,7 @@ def check_impl_naming(
             if clean_name == stem:
                 # File in impl/ but doesn't have Impl suffix
                 # Check it's not a helper/utility
-                if not _is_test_or_util(stem):
+                if not _is_test_or_util(stem) and not _is_module_init(stem) and not _is_known_impl_pattern(stem):
                     violations.append(Violation(
                         file=rel,
                         line=1,
@@ -73,8 +73,16 @@ def check_layer_exists(
             continue
         found = False
         for lpath in layer.paths:
+            # Check direct path
             if (source_root / lpath.rstrip("/")).exists():
                 found = True
+                break
+            # Check recursively (for nested structures like Rust crates, Go internal/)
+            for d in source_root.rglob(lpath.rstrip("/")):
+                if d.is_dir():
+                    found = True
+                    break
+            if found:
                 break
         if not found:
             violations.append(Violation(
@@ -104,6 +112,18 @@ def _strip_impl_suffix(name: str) -> str:
         if name.endswith(suffix):
             return name[: -len(suffix)]
     return name
+
+
+def _is_known_impl_pattern(name: str) -> bool:
+    """Check if name follows known implementation patterns (e.g. OfflineFirst*, *Repository, *Adapter)."""
+    lower = name.lower()
+    return any(p in lower for p in ("repository", "adapter", "factory", "provider", "delegate", "proxy"))
+
+
+def _is_module_init(name: str) -> bool:
+    """Check if file is a language module initializer (not an impl class)."""
+    lower = name.lower()
+    return lower in ("__init__", "mod", "index", "barrel")
 
 
 def _is_test_or_util(name: str) -> bool:

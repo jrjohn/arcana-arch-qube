@@ -30,9 +30,10 @@ allowed_dependencies:
 import_pattern: "\"([^\"]+)\""
 
 di_container_files:
+  - "di/**"
+  - "cmd/**"
   - "**/wire.go"
   - "**/container.go"
-  - "cmd/**"
 
 naming:
   service_impl: "{name}_service_impl.go"

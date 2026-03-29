@@ -57,6 +57,9 @@ def check_layer_direction(
             continue
         if edge.source_layer == edge.target_layer:
             continue
+        # DI container / wiring files can import from any layer
+        if profile.is_di_container(edge.source_file):
+            continue
 
         if not profile.is_allowed_dependency(edge.source_layer, edge.target_layer):
             violations.append(Violation(
