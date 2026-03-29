@@ -108,4 +108,4 @@ def _strip_impl_suffix(name: str) -> str:
 
 def _is_test_or_util(name: str) -> bool:
     lower = name.lower()
-    return any(k in lower for k in ("test", "spec", "mock", "stub", "fixture", "helper", "util"))
+    return any(k in lower for k in ("test", "spec", "mock", "stub", "fixture", "helper", "util", "mod", "__init__"))
