@@ -6,6 +6,12 @@ source_roots: ["internal", "pkg"]
 file_extensions: [".go"]
 
 layers:
+  - name: domain
+    paths: ["domain/", "entity/", "model/"]
+    is_shared: true
+  - name: core
+    paths: ["config/", "pkg/"]
+    is_shared: true
   - name: controller
     paths: ["handler/", "controller/", "api/"]
   - name: service
@@ -14,12 +20,6 @@ layers:
     paths: ["repository/"]
   - name: dao
     paths: ["dao/", "store/"]
-  - name: domain
-    paths: ["domain/", "entity/", "model/"]
-    is_shared: true
-  - name: core
-    paths: ["config/", "pkg/"]
-    is_shared: true
 
 allowed_dependencies:
   controller: [service, domain, core]
