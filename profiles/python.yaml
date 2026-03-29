@@ -33,6 +33,10 @@ di_container_files:
   - "**/di_container.py"
   - "**/container.py"
   - "**/dependencies.py"
+  - "**/adapters/**"
+  - "**/tasks/**"
+  - "**/decorators/**"
+  - "**/routes/**"
 
 naming:
   service_impl: "{name}_service_impl.py"
