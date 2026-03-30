@@ -28,6 +28,8 @@ di_container_files:
   - "**/di/**"
   - "**/*Module.kt"
   - "**/hilt/**"
+  - "data/worker/**"
+  - "data/analytics/**"
 
 naming:
   viewmodel: "{Name}ViewModel.kt"
