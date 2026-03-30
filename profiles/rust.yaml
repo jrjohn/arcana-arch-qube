@@ -7,13 +7,16 @@ file_extensions: [".rs"]
 
 layers:
   - name: controller
-    paths: ["handler/", "api/", "routes/", "arcana-api/"]
+    paths: ["handler/", "api/", "routes/", "arcana-rest/", "arcana-grpc/"]
+    is_shared: true
   - name: service
-    paths: ["service/", "usecase/", "arcana-service/"]
+    paths: ["service/", "usecase/", "arcana-service/", "services/"]
+    is_shared: true
   - name: repository
     paths: ["repository/", "repo/", "arcana-repository/"]
+    is_shared: true
   - name: dao
-    paths: ["dao/", "store/"]
+    paths: ["dao/", "store/", "mysql/"]
     is_shared: true
   - name: domain
     paths: ["domain/", "entity/", "model/", "arcana-domain/"]
