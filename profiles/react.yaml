@@ -24,9 +24,10 @@ allowed_dependencies:
 import_pattern: "import .* from ['\"](.+?)['\"]"
 
 di_container_files:
-  - "core/di/**"
-  - "core/providers/**"
+  - "**/core/di/**"
+  - "**/core/providers/**"
   - "**/container.ts"
+  - "**/serviceConfig.ts"
 
 naming:
   viewmodel: "{name}.view-model.ts"

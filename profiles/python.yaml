@@ -37,6 +37,9 @@ di_container_files:
   - "**/tasks/**"
   - "**/decorators/**"
   - "**/routes/**"
+  - "**/factory.py"
+  - "**/factory/**"
+  - "**/__init__.py"
 
 naming:
   service_impl: "{name}_service_impl.py"

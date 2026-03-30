@@ -2,23 +2,24 @@ framework: rust
 platform: backend
 category: backend
 
-source_roots: ["src"]
+source_roots: ["src", "crates"]
 file_extensions: [".rs"]
 
 layers:
   - name: controller
-    paths: ["handler/", "api/", "routes/"]
+    paths: ["handler/", "api/", "routes/", "arcana-api/"]
   - name: service
-    paths: ["service/", "usecase/"]
+    paths: ["service/", "usecase/", "arcana-service/"]
   - name: repository
-    paths: ["repository/", "repo/"]
+    paths: ["repository/", "repo/", "arcana-repository/"]
   - name: dao
     paths: ["dao/", "store/"]
+    is_shared: true
   - name: domain
-    paths: ["domain/", "entity/", "model/"]
+    paths: ["domain/", "entity/", "model/", "arcana-domain/"]
     is_shared: true
   - name: core
-    paths: ["config/", "infra/"]
+    paths: ["config/", "infra/", "arcana-core/"]
     is_shared: true
 
 allowed_dependencies:
@@ -33,3 +34,4 @@ di_container_files:
   - "**/main.rs"
   - "**/lib.rs"
   - "**/container.rs"
+  - "**/mod.rs"

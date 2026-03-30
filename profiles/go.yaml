@@ -34,6 +34,8 @@ di_container_files:
   - "cmd/**"
   - "**/wire.go"
   - "**/container.go"
+  - "**/grpc/**"
+  - "**/proto/**"
 
 naming:
   service_impl: "{name}_service_impl.go"

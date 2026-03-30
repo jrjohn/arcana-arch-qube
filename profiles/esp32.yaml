@@ -27,5 +27,5 @@ di_container_files:
   - "**/AppContainer*"
   - "**/Controller*"
   - "**/app_main*"
-  - "**/Controller.cpp"
-  - "**/app_main.cpp"
+  - "main/**"
+  - "**/*Impl.cpp"

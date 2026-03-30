@@ -20,7 +20,8 @@ def check_impl_colocation(
             fname = fpath.stem.lower()
 
             # Check if this is an impl file outside an impl/ directory
-            if _is_impl_name(fname) and "impl" not in str(fpath.parent).lower():
+            # Skip if it's a DI container file (legitimately references Impl)
+            if _is_impl_name(fname) and "impl" not in str(fpath.parent).lower() and not profile.is_di_container(rel):
                 violations.append(Violation(
                     file=rel,
                     line=1,

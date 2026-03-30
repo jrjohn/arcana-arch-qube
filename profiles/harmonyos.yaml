@@ -27,6 +27,7 @@ di_container_files:
   - "core/di/**"
   - "core/http/**"
   - "core/sync/**"
+  - "**/DataMigration*"
 
 naming:
   viewmodel: "{Name}ViewModel.ets"
