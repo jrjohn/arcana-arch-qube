@@ -39,16 +39,19 @@ class FrameworkProfile:
     def is_di_container(self, rel_path: str) -> bool:
         """Check if file is a DI container / module file."""
         from pathlib import PurePosixPath
+        from fnmatch import fnmatch
         p = PurePosixPath(rel_path)
         for pat in self.di_container_files:
             # PurePath.match supports ** glob patterns
             if p.match(pat):
                 return True
-            # Also check basename match for simple patterns like "*Config.java"
-            if "*" in pat and "/" not in pat:
-                from fnmatch import fnmatch
-                if fnmatch(p.name, pat):
-                    return True
+            # fnmatch on full path (handles **/ as wildcard prefix)
+            if fnmatch(rel_path, pat.replace("**/", "*")):
+                return True
+            # Check basename match for patterns like "*Impl.cpp", "*Config.java"
+            pat_name = pat.rsplit("/", 1)[-1] if "/" in pat else pat
+            if pat_name != "**" and "*" in pat_name and fnmatch(p.name, pat_name):
+                return True
         return False
 
     def is_allowed_dependency(self, from_layer: str, to_layer: str) -> bool:
