@@ -25,20 +25,31 @@ _SRC_ROOT = Path(__file__).parent.parent.parent  # repo root (dev)
 _PKG_DATA = Path(__file__).parent  # installed package dir
 
 def _find_data_dir(name: str) -> Path:
-    """Find rules/ or profiles/ directory."""
-    # Dev mode: repo root
+    """Find rules/ or profiles/ directory.
+
+    Lookup order (first hit wins):
+      1. Bundled inside installed package (_PKG_DATA / name) — production via pip install
+      2. Repo root (_SRC_ROOT / name) — dev mode
+      3. Docker /app/<name>
+      4. CWD / name
+    """
+    # 1. Installed package (pip install bundles via package-data)
+    candidate = _PKG_DATA / name
+    if candidate.is_dir():
+        return candidate
+    # 2. Repo root (dev mode)
     candidate = _SRC_ROOT / name
     if candidate.is_dir():
         return candidate
-    # Docker /app layout
+    # 3. Docker /app layout
     candidate = Path("/app") / name
     if candidate.is_dir():
         return candidate
-    # Fallback: relative to CWD
+    # 4. CWD
     candidate = Path.cwd() / name
     if candidate.is_dir():
         return candidate
-    return _SRC_ROOT / name  # best guess
+    return _PKG_DATA / name  # best guess (clear path in FileNotFoundError)
 
 
 @click.group()
