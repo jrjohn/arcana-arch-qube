@@ -2,7 +2,7 @@ framework: stm32
 platform: embedded
 category: client
 
-source_roots: ["Targets/stm32f103ze/Services", "Targets/stm32f051c8/Services"]
+source_roots: ["Targets/stm32f103ze/Main", "Targets/stm32f051c8/Main"]
 file_extensions: [".hpp", ".cpp", ".h"]
 
 layers:
@@ -31,6 +31,7 @@ allowed_dependencies:
 import_pattern: "#include\\s+[\"<]([^\"'>]+)[\"'>]"
 
 di_container_files:
+  - "**/AppContainer.cpp"
   - "**/Controller.cpp"
   - "**/F103App.cpp"
   - "**/App.cpp"
