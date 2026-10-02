@@ -10,8 +10,9 @@ def generate_junit(report: ScanReport) -> str:
     suite = Element("testsuite", {
         "name": f"arch-qube-{report.framework}",
         "tests": str(len(report.rule_results)),
-        "failures": str(sum(1 for r in report.rule_results if not r.passed)),
+        "failures": str(sum(1 for r in report.evaluated_results if not r.passed)),
         "errors": "0",
+        "skipped": str(len(report.not_evaluated)),
     })
 
     for r in report.rule_results:
@@ -19,7 +20,9 @@ def generate_junit(report: ScanReport) -> str:
             "name": r.rule_name,
             "classname": f"arch-qube.{r.category}.{r.rule_id}",
         })
-        if not r.passed:
+        if not r.evaluated:
+            SubElement(tc, "skipped", {"message": "not evaluated: no implemented check ran"})
+        elif not r.passed:
             msg_lines = [f"{v.file}:{v.line} — {v.message}" for v in r.violations]
             failure = SubElement(tc, "failure", {
                 "message": f"{r.rule_name}: {len(r.violations)} violation(s)",

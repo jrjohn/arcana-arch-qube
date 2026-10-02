@@ -24,6 +24,17 @@ ast_checks:
         - ".execute("
         - "createQueryBuilder"
         - "raw_sql"
+        # Rust / Go (added 2026-10-02 — the list above is Java/TS-shaped and missed
+        # `sqlx::query(...)` planted in arcana-cloud-rust). Deliberately exact: a bare
+        # ".Query(" also matches Gin's c.Query("param"), and "query_as" matched redis
+        # `.query_async(` in the service crate's cache.
+        - "sqlx::query"
+        - "diesel::"
+        - "*sql.DB"
+        - "*gorm.DB"
+        - ".QueryContext("
+        - ".ExecContext("
+        - ".QueryRowContext("
 
 scoring:
   method: percentage

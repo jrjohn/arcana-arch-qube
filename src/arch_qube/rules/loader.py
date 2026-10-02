@@ -53,4 +53,5 @@ def _parse_rule_file(path: Path) -> Rule | None:
         ast_checks=ast_checks,
         ai_checks=ai_checks,
         pass_threshold=scoring.get("pass_threshold", 100.0),
+        scoring_method=scoring.get("method", "percentage"),
     )

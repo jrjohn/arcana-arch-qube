@@ -1,6 +1,5 @@
-import { UserService } from '../domain/services/user.service';
-import { User } from '../domain/models/user.model';
+import { UserListViewModel } from './user-list.view-model';
 
 export class UserListComponent {
-  constructor(private userService: UserService) {}
+  constructor(public vm: UserListViewModel) {}
 }

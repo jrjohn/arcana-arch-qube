@@ -7,16 +7,16 @@ from arch_qube.rules.models import RuleResult, ScanReport, Severity
 def calculate_score(results: list[RuleResult]) -> tuple[float, str]:
     """Calculate weighted score and letter grade.
 
-    Returns (score 0-100, grade letter).
+    Returns (score 0-100, grade letter). Only rules that were actually evaluated count: a rule
+    no check ran for is unknown, not compliant. If nothing was evaluated there is no evidence of
+    compliance at all, so the score is 0 rather than a free 100.
     """
-    if not results:
-        return 100.0, "A+"
-
-    total_weight = sum(r.weight for r in results)
+    evaluated = [r for r in results if r.evaluated]
+    total_weight = sum(r.weight for r in evaluated)
     if total_weight == 0:
-        return 100.0, "A+"
+        return 0.0, "F"
 
-    weighted_sum = sum(r.weighted_score for r in results)
+    weighted_sum = sum(r.weighted_score for r in evaluated)
     score = (weighted_sum / total_weight) * 100.0
     score = round(score, 1)
 
@@ -38,6 +38,7 @@ def build_report(
     has_critical = any(
         r.severity == Severity.CRITICAL and not r.passed
         for r in results
+        if r.evaluated
     )
 
     passed = score >= threshold and not has_critical
