@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jrjohn/arcana-arch-qube/compare/v0.2.0...v0.3.0) (2026-10-02)
+
+
+### Features
+
+* honest scoring + implement the 7 rule checks the scanner skipped ([#6](https://github.com/jrjohn/arcana-arch-qube/issues/6)) ([013fc1e](https://github.com/jrjohn/arcana-arch-qube/commit/013fc1e88503d280075aee880a90626c20117427))
+
 ## [0.2.0](https://github.com/jrjohn/arcana-arch-qube/compare/v0.1.1...v0.2.0) (2026-10-02)
 
 
