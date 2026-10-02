@@ -135,7 +135,7 @@ def scan(
             console.print(f"Diff mode: {len(changed_files)} changed file(s)\n")
 
     # Run AST scan
-    results = run_ast_scan(effective_root, profile, rules)
+    results = run_ast_scan(effective_root, profile, rules, project_root=source_root)
 
     # Run AI scan (unless --no-ai)
     ai_stats = None

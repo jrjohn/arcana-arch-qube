@@ -7,6 +7,10 @@ category: common
 severity: major
 weight: 7
 
+# Backend only: in a client MVVM app the ViewModel consuming domain models is the design
+# (presentation -> domain is an allowed dependency); DTOs belong at the API boundary.
+applies_to: [springboot, python, go, rust, nodejs]
+
 ast_checks:
   - type: import_restriction
     check: "boundary_uses_dto"

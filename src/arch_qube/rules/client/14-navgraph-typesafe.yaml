@@ -7,6 +7,9 @@ category: client
 severity: major
 weight: 3
 
+# Firmware (esp32/stm32) has no navigation; the rule only means something for UI apps.
+applies_to: [angular, react, vue, ios, android, harmonyos, windows]
+
 ast_checks:
   - type: file_structure
     check: "navgraph_exists"

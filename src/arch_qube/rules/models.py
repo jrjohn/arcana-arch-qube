@@ -81,6 +81,7 @@ class Rule:
     ast_checks: list[AstCheck] = field(default_factory=list)
     ai_checks: list[AiCheck] = field(default_factory=list)
     pass_threshold: float = 100.0
+    scoring_method: str = "percentage"  # or "boolean"
 
 
 @dataclass
