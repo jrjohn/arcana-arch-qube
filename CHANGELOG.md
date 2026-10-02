@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/jrjohn/arcana-arch-qube/compare/v0.3.0...v0.4.0) (2026-10-02)
+
+
+### Features
+
+* dependency inversion support + module boundary rule (Fowler) ([#8](https://github.com/jrjohn/arcana-arch-qube/issues/8)) ([f7cecd7](https://github.com/jrjohn/arcana-arch-qube/commit/f7cecd7b2c9f0377720d4322494c02ea2a5812f1))
+
 ## [0.3.0](https://github.com/jrjohn/arcana-arch-qube/compare/v0.2.0...v0.3.0) (2026-10-02)
 
 
