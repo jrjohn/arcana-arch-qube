@@ -58,13 +58,7 @@ def _content_layer(profile, rel: str) -> str | None:
     imports from being flagged), so internal/domain/service/x.go classifies as domain and the
     service checks never saw a go service. If the first match is a shared layer, a more specific
     non-shared layer in the same path wins. Import-direction rules keep using classify_file."""
-    first = profile.classify_file(rel)
-    shared = {l.name for l in profile.layers if l.is_shared}
-    if first is None or first in shared:
-        for layer in profile.layers:
-            if not layer.is_shared and any(p in rel for p in layer.paths):
-                return layer.name
-    return first
+    return profile.classify_specific(rel)
 
 
 def _code_lines(lines: list[str]) -> Iterator[tuple[int, str]]:

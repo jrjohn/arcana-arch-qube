@@ -6,12 +6,11 @@ source_roots: ["internal", "pkg"]
 file_extensions: [".go"]
 
 layers:
-  - name: domain
-    paths: ["domain/", "entity/", "model/"]
-    is_shared: true
-  - name: core
-    paths: ["config/", "pkg/"]
-    is_shared: true
+  # Conventional order, like the other backends. Until 2026-10-02 the shared domain layer was
+  # listed first (ec6ebe0) so that internal/domain/{service,repository,dao} classified as
+  # "domain" — that silenced violations by hiding those layers from every import-direction rule.
+  # classify_specific() now lets service/repository/dao win inside domain/; a Go package import
+  # (a directory, no trailing slash) is matched as a directory.
   - name: controller
     paths: ["handler/", "controller/", "api/"]
   - name: service
@@ -20,6 +19,12 @@ layers:
     paths: ["repository/"]
   - name: dao
     paths: ["dao/", "store/"]
+  - name: domain
+    paths: ["domain/", "entity/", "model/"]
+    is_shared: true
+  - name: core
+    paths: ["config/", "pkg/"]
+    is_shared: true
 
 allowed_dependencies:
   controller: [service, domain, core]

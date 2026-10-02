@@ -29,11 +29,15 @@ def build_import_graph(
             if _is_test_file(fpath.name):
                 continue
             rel = str(fpath.relative_to(source_root))
-            src_layer = profile.classify_file(rel)
+            src_layer = profile.classify_specific(rel)
             imports = _parse_file_imports(fpath, profile)
 
             for line_num, target in imports:
-                tgt_layer = profile.classify_file(target)
+                # classify_specific: Go imports a package (a directory, no trailing slash), and the
+                # go profile lists the shared domain layer first — together they left
+                # internal/domain/{service,dao,repository} unclassified or "domain", so only 3% of
+                # arcana-cloud-go's internal import edges were ever checked.
+                tgt_layer = profile.classify_specific(target)
                 edges.append(ImportEdge(
                     source_file=rel,
                     target_import=target,
@@ -62,6 +66,8 @@ def check_layer_direction(
             continue
 
         if not profile.is_allowed_dependency(edge.source_layer, edge.target_layer):
+            if edge.target_layer in profile.dip_ports and not _is_impl_target(edge.target_import):
+                continue  # implementing an upper layer's interface (dependency inversion)
             violations.append(Violation(
                 file=edge.source_file,
                 line=edge.line,
@@ -126,6 +132,9 @@ def _parse_file_imports(
     except OSError:
         return []
 
+    if fpath.suffix == ".go":
+        return _parse_go_imports(lines)
+
     results: list[tuple[int, str]] = []
     pattern = re.compile(profile.import_pattern)
 
@@ -155,6 +164,39 @@ def _parse_file_imports(
 
             results.append((i, target))
     return results
+
+
+def _is_impl_target(target: str) -> bool:
+    t = target.lower().rstrip("/")
+    last = t.rsplit("/", 1)[-1]
+    return "/impl/" in t + "/" or last.endswith("impl") or last.endswith("_impl") or ".impl." in t
+
+
+def _parse_go_imports(lines: list[str]) -> list[tuple[int, str]]:
+    """Only real Go imports: `import "x"` and the lines of an `import ( ... )` block. The go
+    profile's pattern (any double-quoted string) also matched every string literal, so a URL like
+    "/api/service/x" in a service file became a fake cross-layer import."""
+    import re
+    out: list[tuple[int, str]] = []
+    in_block = False
+    for i, line in enumerate(lines, 1):
+        s = line.strip()
+        if in_block:
+            if s.startswith(")"):
+                in_block = False
+                continue
+            m = re.search(r'"([^"]+)"', s)
+            if m and not s.startswith("//"):
+                out.append((i, m.group(1)))
+        elif s.startswith("import ("):
+            in_block = True
+        elif s.startswith("import "):
+            m = re.search(r'"([^"]+)"', s)
+            if m:
+                out.append((i, m.group(1)))
+        elif s.startswith(("func ", "type ", "var ", "const ")):
+            break  # imports are over
+    return out
 
 
 def _is_test_file(filename: str) -> bool:
