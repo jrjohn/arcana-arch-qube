@@ -38,3 +38,8 @@ naming:
   repository: "{name}.repository.ts"
   dto: "{name}.dto.ts"
   mapper: "{name}.mapper.ts"
+
+# Domain-oriented feature modules (rule 22, module-boundary)
+modules:
+  roots: ["features/"]
+  public: ["index.ts", "public-api.ts", "*.routes.ts", "api/"]

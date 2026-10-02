@@ -33,6 +33,7 @@ def generate_json(report: ScanReport) -> str:
                 "compliance": r.compliance if r.evaluated else None,
                 "weighted_score": round(r.weighted_score, 2) if r.evaluated else None,
                 "unimplemented_checks": r.unimplemented_checks,
+                "not_applicable": r.not_applicable,
                 "violations": [
                     {
                         "file": v.file,

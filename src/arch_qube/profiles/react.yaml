@@ -32,3 +32,8 @@ di_container_files:
 naming:
   viewmodel: "{name}.view-model.ts"
   repository: "{name}.repository.ts"
+
+# Domain-oriented feature modules (rule 22, module-boundary)
+modules:
+  roots: ["features/"]
+  public: ["index.ts", "index.tsx", "api/"]
