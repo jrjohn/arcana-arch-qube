@@ -155,6 +155,7 @@ def scan(
                 # Merge violations into existing AST result
                 for existing in results:
                     if existing.rule_id == ai_r.rule_id:
+                        existing.evaluated = True  # the AI check ran for this rule
                         existing.violations.extend(ai_r.violations)
                         if ai_r.violations:
                             violating = len(set(v.file for v in existing.violations))
@@ -221,19 +222,28 @@ def _print_table(report):
     table.add_column("Compliance", justify="right")
     table.add_column("Status", justify="center")
 
-    for r in sorted(report.rule_results, key=lambda x: x.compliance):
+    for r in sorted(report.rule_results, key=lambda x: (not x.evaluated, x.compliance)):
         sev_color = {"critical": "red", "major": "yellow", "minor": "blue", "info": "dim"}.get(
             r.severity.value, "white"
         )
-        status = "[green]PASS[/green]" if r.passed else "[red]FAIL[/red]"
+        if not r.evaluated:
+            status, compliance = "[dim]NOT EVALUATED[/dim]", "—"
+        else:
+            status = "[green]PASS[/green]" if r.passed else "[red]FAIL[/red]"
+            compliance = f"{r.compliance:.0f}%"
         table.add_row(
             r.rule_name,
             f"[{sev_color}]{r.severity.value}[/{sev_color}]",
-            f"{r.compliance:.0f}%",
+            compliance,
             status,
         )
 
     console.print(table)
+    if report.not_evaluated:
+        console.print(
+            f"[yellow]{len(report.not_evaluated)} rule(s) not evaluated[/yellow] (no implemented "
+            "check ran; excluded from the score)"
+        )
 
 
 _PRE_COMMIT_HOOK = """\

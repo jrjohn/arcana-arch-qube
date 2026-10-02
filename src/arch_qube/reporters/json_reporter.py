@@ -29,8 +29,10 @@ def generate_json(report: ScanReport) -> str:
                 "category": r.category,
                 "severity": r.severity.value,
                 "weight": r.weight,
-                "compliance": r.compliance,
-                "weighted_score": round(r.weighted_score, 2),
+                "evaluated": r.evaluated,
+                "compliance": r.compliance if r.evaluated else None,
+                "weighted_score": round(r.weighted_score, 2) if r.evaluated else None,
+                "unimplemented_checks": r.unimplemented_checks,
                 "violations": [
                     {
                         "file": v.file,
@@ -48,8 +50,11 @@ def generate_json(report: ScanReport) -> str:
         "summary": {
             "critical_violations": report.critical_violations,
             "total_violations": report.total_violations,
-            "rules_passed": sum(1 for r in report.rule_results if r.passed),
-            "rules_failed": sum(1 for r in report.rule_results if not r.passed),
+            "rules_passed": sum(1 for r in report.evaluated_results if r.passed),
+            "rules_failed": sum(1 for r in report.evaluated_results if not r.passed),
+            "rules_evaluated": len(report.evaluated_results),
+            "rules_not_evaluated": len(report.not_evaluated),
+            "not_evaluated": [r.rule_id for r in report.not_evaluated],
             "rules_total": len(report.rule_results),
         },
     }

@@ -37,6 +37,13 @@ class RuleResult:
     violations: list[Violation] = field(default_factory=list)
     files_checked: int = 0
     check_type: CheckType = CheckType.AST
+    # False when no check for this rule actually ran (no AST check this scanner implements, and
+    # no AI result). Such a rule says nothing about the code, so it is excluded from the score
+    # instead of counting as 100% compliant — which is what silently happened before 2026-10-02:
+    # 13 of 21 rules were never checked yet contributed ~55 of every 100 points.
+    evaluated: bool = True
+    # check names declared in the rule YAML that this scanner has no implementation for
+    unimplemented_checks: list[str] = field(default_factory=list)
 
     @property
     def weighted_score(self) -> float:
@@ -86,6 +93,14 @@ class ScanReport:
     passed: bool
     threshold: float
     rule_results: list[RuleResult] = field(default_factory=list)
+
+    @property
+    def evaluated_results(self) -> list[RuleResult]:
+        return [r for r in self.rule_results if r.evaluated]
+
+    @property
+    def not_evaluated(self) -> list[RuleResult]:
+        return [r for r in self.rule_results if not r.evaluated]
 
     @property
     def critical_violations(self) -> int:

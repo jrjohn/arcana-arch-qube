@@ -3,7 +3,7 @@ from pathlib import Path
 from arch_qube.rules.loader import load_rules
 from arch_qube.rules.models import Severity
 
-RULES_DIR = Path(__file__).parent.parent / "rules"
+RULES_DIR = Path(__file__).parent.parent / "src" / "arch_qube" / "rules"
 
 
 def test_load_all_rules():

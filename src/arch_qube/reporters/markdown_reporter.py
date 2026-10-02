@@ -21,12 +21,25 @@ def generate_markdown(report: ScanReport) -> str:
         f"|------|----------|------------|--------|",
     ]
 
-    for r in sorted(report.rule_results, key=lambda x: x.compliance):
+    for r in sorted(report.evaluated_results, key=lambda x: x.compliance):
         status_mark = "PASS" if r.passed else "FAIL"
         lines.append(
             f"| {r.rule_name} | {r.severity.value} | "
             f"{r.compliance:.0f}% | {status_mark} |"
         )
+
+    if report.not_evaluated:
+        lines.extend([
+            "",
+            f"## Not evaluated ({len(report.not_evaluated)} rules — excluded from the score)",
+            "",
+            "No check this scanner implements ran for these rules, so they say nothing about the code.",
+            "",
+        ])
+        for r in report.not_evaluated:
+            why = (f"check not implemented: {', '.join(r.unimplemented_checks)}"
+                   if r.unimplemented_checks else "no automated check defined (AI-only rule)")
+            lines.append(f"- {r.rule_name} ({r.severity.value}) — {why}")
 
     # Violations section
     if report.total_violations > 0:

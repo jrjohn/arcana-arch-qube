@@ -6,8 +6,8 @@ from arch_qube.scanner import run_ast_scan
 from arch_qube.scoring.engine import build_report
 
 FIXTURES = Path(__file__).parent / "fixtures"
-RULES_DIR = Path(__file__).parent.parent / "rules"
-PROFILES_DIR = Path(__file__).parent.parent / "profiles"
+RULES_DIR = Path(__file__).parent.parent / "src" / "arch_qube" / "rules"
+PROFILES_DIR = Path(__file__).parent.parent / "src" / "arch_qube" / "profiles"
 
 
 def test_angular_good_has_no_violations():
