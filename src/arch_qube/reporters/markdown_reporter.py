@@ -37,8 +37,12 @@ def generate_markdown(report: ScanReport) -> str:
             "",
         ])
         for r in report.not_evaluated:
-            why = (f"check not implemented: {', '.join(r.unimplemented_checks)}"
-                   if r.unimplemented_checks else "no automated check defined (AI-only rule)")
+            if r.not_applicable:
+                why = "not applicable to this project"
+            elif r.unimplemented_checks:
+                why = f"check not implemented: {', '.join(r.unimplemented_checks)}"
+            else:
+                why = "no automated check defined (AI-only rule)"
             lines.append(f"- {r.rule_name} ({r.severity.value}) — {why}")
 
     # Violations section

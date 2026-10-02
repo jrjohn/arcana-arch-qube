@@ -58,13 +58,7 @@ def _content_layer(profile, rel: str) -> str | None:
     imports from being flagged), so internal/domain/service/x.go classifies as domain and the
     service checks never saw a go service. If the first match is a shared layer, a more specific
     non-shared layer in the same path wins. Import-direction rules keep using classify_file."""
-    first = profile.classify_file(rel)
-    shared = {l.name for l in profile.layers if l.is_shared}
-    if first is None or first in shared:
-        for layer in profile.layers:
-            if not layer.is_shared and any(p in rel for p in layer.paths):
-                return layer.name
-    return first
+    return profile.classify_specific(rel)
 
 
 def _code_lines(lines: list[str]) -> Iterator[tuple[int, str]]:
@@ -325,4 +319,64 @@ def check_transaction_placement(ctx, check) -> list[Violation]:
                 out.append(_v(rel, n, f"Transaction boundary in '{ctx.profile.classify_file(rel)}': "
                                       f"'{line.strip()[:80]}'",
                               "Put the transaction on the Service method that owns the unit of work."))
+    return out
+
+
+# ---------- 22 module-boundary: modules meet only through each other's public surface ----------
+# Fowler (Presentation Domain Data Layering): once a layer grows, "split your top level into domain
+# oriented modules which are internally layered". The layer rules cannot see one module reaching
+# into another's internals; this check can. A module is a directory directly under one of the
+# profile's modules.roots that contains files (features/users/..., not a flat screens/Home.kt).
+
+_SHARED_MODULES = {"shared", "common", "core", "ui", "components"}
+
+
+def _module_of(path: str, roots: list[str]) -> str | None:
+    p = "/" + path.strip("/")
+    for root in roots:
+        i = p.find("/" + root)
+        if i < 0:
+            continue
+        rest = p[i + 1 + len(root):].split("/")
+        if len(rest) >= 2 and rest[0]:  # a directory under the root, with something inside it
+            return root + rest[0]
+    return None
+
+
+def _is_public(target: str, module: str, patterns: list[str]) -> bool:
+    from fnmatch import fnmatch
+    inside = target.split(module, 1)[-1].strip("/")
+    name = inside.rsplit("/", 1)[-1]
+    stem = name.split(".")[0]
+    for pat in patterns:
+        if pat.endswith("/") and (inside + "/").startswith(pat):
+            return True
+        if fnmatch(name, pat) or fnmatch(stem, pat) or fnmatch(name, pat.rsplit(".", 1)[0]):
+            return True
+    return False
+
+
+def check_module_public_api_only(ctx, check) -> list[Violation] | None:
+    roots = ctx.profile.module_roots
+    if not roots:
+        return None
+    modules = set()
+    for ext in ctx.profile.file_extensions:
+        for fpath in ctx.source_root.rglob(f"*{ext}"):
+            m = _module_of(str(fpath.relative_to(ctx.source_root)), roots)
+            if m:
+                modules.add(m)
+    if len(modules) < 2:
+        return None  # nothing to keep apart
+    public = ctx.profile.module_public or ["index", "public-api", "api/"]
+    out = []
+    for e in ctx.edges:
+        src, tgt = _module_of(e.source_file, roots), _module_of(e.target_import, roots)
+        if not src or not tgt or src == tgt:
+            continue
+        if tgt.rsplit("/", 1)[-1].lower() in _SHARED_MODULES or _is_public(e.target_import, tgt, public):
+            continue
+        out.append(_v(e.source_file, e.line,
+                      f"Module '{src}' reaches into '{tgt}' internals: '{e.target_import}'",
+                      f"Expose what is needed from '{tgt}' through its public API ({', '.join(public)})."))
     return out

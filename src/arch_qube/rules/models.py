@@ -44,6 +44,8 @@ class RuleResult:
     evaluated: bool = True
     # check names declared in the rule YAML that this scanner has no implementation for
     unimplemented_checks: list[str] = field(default_factory=list)
+    # True when every implemented check declined because it cannot apply here (no modules, ...)
+    not_applicable: bool = False
 
     @property
     def weighted_score(self) -> float:

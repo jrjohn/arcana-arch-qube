@@ -1,0 +1,22 @@
+# Module Boundary
+# Fowler, Presentation Domain Data Layering (martinfowler.com/bliki/PresentationDomainDataLayering.html):
+# "once any of these layers gets too big you should split your top level into domain oriented
+# modules which are internally layered". Layer rules cannot see one module reaching into another's
+# internals; this rule does. Applies to profiles that declare modules.roots and only when the
+# project actually has two or more modules — otherwise it is reported as not evaluated.
+
+id: module-boundary
+name: Module Boundary
+description: A module may use another module only through that module's public API (index / public-api / api/), never its internal files.
+category: common
+severity: major
+weight: 5
+
+ast_checks:
+  - type: import_restriction
+    check: "module_public_api_only"
+    description: "Cross-module imports must target the other module's public surface"
+
+scoring:
+  method: percentage
+  pass_threshold: 100

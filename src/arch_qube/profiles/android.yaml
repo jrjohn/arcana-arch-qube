@@ -35,3 +35,8 @@ naming:
   viewmodel: "{Name}ViewModel.kt"
   service_impl: "{Name}ServiceImpl.kt"
   repository: "{Name}Repository.kt"
+
+# Domain-oriented feature modules (rule 22, module-boundary)
+modules:
+  roots: ["features/", "feature/", "screens/"]
+  public: ["*Api.kt", "api/", "*Navigation.kt"]

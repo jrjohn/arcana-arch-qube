@@ -73,5 +73,8 @@ def test_every_bundled_rule_check_name_is_either_implemented_or_reported():
             continue
         names = [c.check for c in rule.ast_checks]
         res = by_id[rule.id]
-        assert res.evaluated == any(n in HANDLERS for n in names), rule.id
+        implemented = any(n in HANDLERS for n in names)
+        # evaluated => something implemented ran; a handler may also decline (not applicable)
+        assert not res.evaluated or implemented, rule.id
+        assert implemented or not res.evaluated, rule.id
         assert res.unimplemented_checks == [n for n in names if n not in HANDLERS], rule.id

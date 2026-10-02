@@ -28,7 +28,9 @@ class ScanContext:
     project_root: Path  # the scanned path itself (source_root may be a sub-dir such as src/)
 
 
-Handler = Callable[[ScanContext, AstCheck], list[Violation]]
+# A handler returns the violations it found, or None when its check cannot apply to this project
+# (e.g. module boundaries in a project with no modules) — the rule is then "not evaluated".
+Handler = Callable[[ScanContext, AstCheck], "list[Violation] | None"]
 
 # Every check name a rule YAML may use, mapped to the code that performs it. A name missing from
 # this table is NOT silently treated as "no violations": the rule is reported as not evaluated
@@ -47,6 +49,7 @@ HANDLERS: dict[str, Handler] = {
     "navgraph_exists": cc.check_navgraph_exists,
     "no_db_in_service": cc.check_no_db_in_service,
     "transaction_placement": cc.check_transaction_placement,
+    "module_public_api_only": cc.check_module_public_api_only,
 }
 
 
@@ -77,6 +80,7 @@ def run_ast_scan(
 
         violations: list[Violation] = []
         ran = 0
+        declined = 0
         unimplemented: list[str] = []
 
         for check in rule.ast_checks:
@@ -84,7 +88,11 @@ def run_ast_scan(
             if handler is None:
                 unimplemented.append(check.check)
                 continue
-            violations.extend(handler(ctx, check))
+            found = handler(ctx, check)
+            if found is None:  # the check does not apply to this project (e.g. it has no modules)
+                declined += 1
+                continue
+            violations.extend(found)
             ran += 1
 
         # Deduplicate violations by (file, line, message)
@@ -118,6 +126,7 @@ def run_ast_scan(
             check_type=CheckType.AST,
             evaluated=ran > 0,
             unimplemented_checks=unimplemented,
+            not_applicable=ran == 0 and declined > 0,
         ))
 
     return results
