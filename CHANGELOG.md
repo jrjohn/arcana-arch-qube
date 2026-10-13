@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/jrjohn/arcana-arch-qube/compare/v0.4.0...v0.4.1) (2026-10-13)
+
+
+### Bug Fixes
+
+* **deps:** update python docker tag to v3.15 ([#10](https://github.com/jrjohn/arcana-arch-qube/issues/10)) ([f47475e](https://github.com/jrjohn/arcana-arch-qube/commit/f47475e44c9cb5da5d3726a1946ad2a72da7229d))
+
 ## [0.4.0](https://github.com/jrjohn/arcana-arch-qube/compare/v0.3.0...v0.4.0) (2026-10-02)
 
 
