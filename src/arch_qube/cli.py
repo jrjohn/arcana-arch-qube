@@ -171,7 +171,7 @@ def scan(
     file_count = sum(
         1
         for ext in profile.file_extensions
-        for _ in effective_root.rglob(f"*{ext}")
+        for _ in profile.source_files(effective_root, ext)
     )
 
     # Build report

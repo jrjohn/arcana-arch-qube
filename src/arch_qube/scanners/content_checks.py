@@ -14,7 +14,7 @@ from typing import Iterator
 from arch_qube.rules.models import CheckType, Violation
 
 # Boundary = the layer that talks to the outside world.
-_BOUNDARY = {"backend": {"controller"}, "client": {"presentation"}}
+_BOUNDARY = {"backend": {"controller"}, "client": {"presentation", "view"}}
 
 _COMMENT_PREFIXES = ("//", "#", "*", "/*", "--", "<!--")
 
@@ -40,7 +40,7 @@ def _layer_files(ctx, layers: set[str], skip_di: bool = True) -> Iterator[tuple[
     (right for import-direction checks — they re-export), but SQL in a service crate's lib.rs is
     still SQL in the service layer (a planted query there went unseen on 2026-10-02)."""
     for ext in ctx.profile.file_extensions:
-        for fpath in ctx.source_root.rglob(f"*{ext}"):
+        for fpath in ctx.profile.source_files(ctx.source_root, ext):
             rel = str(fpath.relative_to(ctx.source_root))
             if _is_test_path(rel) or (skip_di and ctx.profile.is_di_container(rel)):
                 continue
@@ -242,7 +242,7 @@ _SERVICE_TARGET = re.compile(r"(^|/)services?(/|$)|service$|[-_.]service(\.|$)|u
 # translation (a translate pipe *is* a view of the i18n service), navigation, theming, logging,
 # user notifications. Rule 12 is about business services (UserService, OrderService ...).
 # arcana-angular: all 6 first-pass hits were i18n.service / nav-graph.service.
-_CROSS_CUTTING = re.compile(r"i18n|l10n|translat|locale|nav(igation|[-_]?graph)?[-_.]?service|"
+_CROSS_CUTTING = re.compile(r"i18n|l10n|translat|locale|locali[sz]ation|nav(igation|[-_]?graph)?[-_.]?service|"
                             r"router|routing|theme|logger|logging|analytics|toast|notification|"
                             r"snackbar|dialog|modal", re.I)
 
@@ -250,7 +250,7 @@ _CROSS_CUTTING = re.compile(r"i18n|l10n|translat|locale|nav(igation|[-_]?graph)?
 def check_view_no_service_import(ctx, check) -> list[Violation]:
     out = []
     for e in ctx.edges:
-        if e.source_layer != "presentation" or ctx.profile.is_di_container(e.source_file):
+        if e.source_layer not in ("presentation", "view") or ctx.profile.is_di_container(e.source_file):
             continue
         if _VIEWMODEL_FILE.search("/" + e.source_file):
             continue
@@ -268,7 +268,7 @@ def check_view_no_service_import(ctx, check) -> list[Violation]:
 # ---------- 14 navgraph-typesafe: a navigation graph / route table exists ----------
 
 _NAV_FILE = re.compile(r"nav[-_]?graph|navigation|router|routes|routing|approute|main_pages\.json|"
-                       r"route\.(ts|kt|swift|ets|cs|tsx)$", re.I)
+                       r"route\.(ts|kt|swift|ets|cs|tsx)$|(^|/)nav\.rs$", re.I)
 
 
 def check_navgraph_exists(ctx, check) -> list[Violation]:
@@ -362,7 +362,7 @@ def check_module_public_api_only(ctx, check) -> list[Violation] | None:
         return None
     modules = set()
     for ext in ctx.profile.file_extensions:
-        for fpath in ctx.source_root.rglob(f"*{ext}"):
+        for fpath in ctx.profile.source_files(ctx.source_root, ext):
             m = _module_of(str(fpath.relative_to(ctx.source_root)), roots)
             if m:
                 modules.add(m)

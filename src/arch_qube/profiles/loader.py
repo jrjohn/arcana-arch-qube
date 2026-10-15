@@ -35,6 +35,22 @@ class FrameworkProfile:
     # may only use it through module_public files.
     module_roots: list[str] = field(default_factory=list)
     module_public: list[str] = field(default_factory=list)
+    # How `use` paths are turned into file paths. "rust_workspace": crate::/super::/self:: resolve
+    # against the importing file, and `use other_crate::x` resolves to that workspace crate's
+    # directory (found from its Cargo.toml) — so an import can be classified by the same layer
+    # paths as a file. Without it a Rust import is a bare `arcana_infra::x` that matches no layer.
+    import_resolver: str | None = None
+    # Directory names never scanned (build output, tooling crates). Empty = scan everything under
+    # the source root, as before.
+    exclude_dirs: list[str] = field(default_factory=list)
+
+    def source_files(self, root: Path, ext: str, pattern: str | None = None):
+        """root.rglob for one extension, minus exclude_dirs."""
+        for f in root.rglob(pattern or f"*{ext}"):
+            if self.exclude_dirs and any(
+                    part in self.exclude_dirs for part in f.relative_to(root).parts[:-1]):
+                continue
+            yield f
 
     def get_layer_order(self) -> list[str]:
         return [l.name for l in self.layers]
@@ -120,4 +136,6 @@ def load_profile(profiles_dir: Path, framework: str) -> FrameworkProfile:
         dip_ports=(data.get("dependency_inversion") or {}).get("ports", []),
         module_roots=(data.get("modules") or {}).get("roots", []),
         module_public=(data.get("modules") or {}).get("public", []),
+        import_resolver=data.get("import_resolver"),
+        exclude_dirs=data.get("exclude_dirs", []),
     )

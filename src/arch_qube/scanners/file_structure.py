@@ -15,7 +15,7 @@ def check_impl_colocation(
     violations: list[Violation] = []
 
     for ext in profile.file_extensions:
-        for fpath in source_root.rglob(f"*{ext}"):
+        for fpath in profile.source_files(source_root, ext):
             rel = str(fpath.relative_to(source_root))
             fname = fpath.stem.lower()
 
@@ -41,7 +41,7 @@ def check_impl_naming(
 
     for ext in profile.file_extensions:
         # Find all files in impl/ directories
-        for fpath in source_root.rglob(f"impl/*{ext}"):
+        for fpath in profile.source_files(source_root, ext, f"impl/*{ext}"):
             rel = str(fpath.relative_to(source_root))
             stem = fpath.stem
 

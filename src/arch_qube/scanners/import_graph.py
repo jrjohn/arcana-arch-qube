@@ -2,6 +2,7 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
+import re
 
 from arch_qube.profiles.loader import FrameworkProfile
 from arch_qube.rules.models import Violation, CheckType
@@ -22,15 +23,22 @@ def build_import_graph(
 ) -> list[ImportEdge]:
     """Walk source files and extract all import edges with layer classification."""
     edges: list[ImportEdge] = []
+    rust_ws = profile.import_resolver == "rust_workspace"
+    crates = _rust_crate_dirs(source_root) if rust_ws else {}
 
     for ext in profile.file_extensions:
-        for fpath in source_root.rglob(f"*{ext}"):
+        for fpath in profile.source_files(source_root, ext):
             # Skip test/spec/mock files — they legitimately import Impl
             if _is_test_file(fpath.name):
                 continue
             rel = str(fpath.relative_to(source_root))
+            if rust_ws and _is_rust_test(rel):
+                continue
             src_layer = profile.classify_specific(rel)
-            imports = _parse_file_imports(fpath, profile)
+            if rust_ws and fpath.suffix == ".rs":
+                imports = _parse_rust_imports(fpath, source_root, crates)
+            else:
+                imports = _parse_file_imports(fpath, profile)
 
             for line_num, target in imports:
                 # classify_specific: Go imports a package (a directory, no trailing slash), and the
@@ -164,6 +172,79 @@ def _parse_file_imports(
 
             results.append((i, target))
     return results
+
+
+_RUST_USE = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?use\s+(?:::)?([A-Za-z0-9_:]+)")
+
+
+def _rust_crate_dirs(root: Path) -> dict[str, str]:
+    """{crate_name_with_underscores: "<dir relative to root>/src"} for every workspace crate."""
+    out: dict[str, str] = {}
+    for toml in root.rglob("Cargo.toml"):
+        if "target" in toml.relative_to(root).parts:
+            continue
+        m = re.search(r'^\[package\][^\[]*?^name\s*=\s*"([^"]+)"',
+                      toml.read_text(encoding="utf-8", errors="ignore"), re.M | re.S)
+        if m:
+            d = toml.parent.relative_to(root).as_posix()
+            out[m.group(1).replace("-", "_")] = (d + "/src") if d != "." else "src"
+    return out
+
+
+def _is_rust_test(rel: str) -> bool:
+    """Integration tests (tests/), `tests.rs` / `*_tests.rs` test modules, benches and examples
+    wire concrete types on purpose."""
+    parts = rel.split("/")
+    name = parts[-1]
+    return (any(p in ("tests", "benches", "examples") for p in parts[:-1])
+            or name == "tests.rs" or name.endswith("_tests.rs"))
+
+
+def _parse_rust_imports(fpath: Path, root: Path, crates: dict[str, str]) -> list[tuple[int, str]]:
+    """`use` paths resolved to project-relative module paths:
+    crate::a::b -> <crate>/src/a/b, super::x -> parent module dir, other_ws_crate::a -> its dir.
+    External crates stay as written with '::' (egui::Ui), so a layer path "egui::" can name them.
+    Parsing stops at #[cfg(test)]: the inline test module wires concrete types on purpose."""
+    try:
+        lines = fpath.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return []
+    rel = fpath.relative_to(root).as_posix()
+    # the module directory of this file: a/b.rs is module a/b; a/mod.rs, lib.rs, main.rs are a/
+    parts = rel.split("/")
+    mod_dir = parts[:-1] if parts[-1] in ("mod.rs", "lib.rs", "main.rs") else parts[:-1] + [parts[-1][:-3]]
+    src_idx = max((i for i, p in enumerate(parts[:-1]) if p == "src"), default=None)
+    crate_src = parts[: src_idx + 1] if src_idx is not None else parts[:-1]
+    out: list[tuple[int, str]] = []
+    for i, line in enumerate(lines, 1):
+        if line.strip().startswith("#[cfg(test)]"):
+            break
+        m = _RUST_USE.match(line)
+        if not m:
+            continue
+        segs = [x for x in m.group(1).split("::") if x]
+        if not segs:
+            continue
+        head = segs[0]
+        if head == "crate":
+            base, rest = crate_src, segs[1:]
+        elif head in ("super", "self"):
+            base, rest = list(mod_dir), segs
+            while rest and rest[0] in ("super", "self"):
+                if rest.pop(0) == "super" and len(base) > len(crate_src):
+                    base = base[:-1]
+        elif head in crates:
+            base, rest = crates[head].split("/"), segs[1:]
+        elif ((root / "/".join(mod_dir) / f"{head}.rs").is_file()
+              or (root / "/".join(mod_dir) / head).is_dir()):
+            if line.lstrip().startswith("pub"):
+                continue  # a module re-exporting its own child (`pub use view::show`) is structure
+            base, rest = list(mod_dir), segs  # a child module of this one (`use shell::Shell`)
+        else:
+            out.append((i, m.group(1).lstrip(":")))
+            continue
+        out.append((i, "/".join(base + rest)))
+    return out
 
 
 def _is_impl_target(target: str) -> bool:
