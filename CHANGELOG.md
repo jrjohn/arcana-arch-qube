@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/jrjohn/arcana-arch-qube/compare/v0.4.1...v0.5.0) (2026-10-16)
+
+
+### Features
+
+* rust-desktop profile ([#12](https://github.com/jrjohn/arcana-arch-qube/issues/12)) ([17a7a0f](https://github.com/jrjohn/arcana-arch-qube/commit/17a7a0fef2e9330e42f4fbd6db856f4d7fdea095))
+
 ## [0.4.1](https://github.com/jrjohn/arcana-arch-qube/compare/v0.4.0...v0.4.1) (2026-10-13)
 
 
