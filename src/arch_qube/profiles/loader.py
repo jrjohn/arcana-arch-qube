@@ -10,6 +10,18 @@ class LayerDef:
     name: str
     paths: list[str]
     is_shared: bool = False
+    # Item-level layer: a target matches only if its LAST path segment is one of these names (as
+    # well as one of `paths`). Lets a layer own a few data types of a module that also holds
+    # services — e.g. plugin_api's MenuLocation enum lives in services/menu.rs next to the
+    # MenuRegistry trait. A source *file* never ends in a bare item name, so files keep their
+    # crate's layer; only imports of the listed items are reclassified.
+    items: list[str] = field(default_factory=list)
+
+    def matches(self, rel_path: str) -> bool:
+        probe = "/" + rel_path
+        if not any("/" + p in probe for p in self.paths):
+            return False
+        return not self.items or probe.rstrip("/").rsplit("/", 1)[-1] in self.items
 
 
 @dataclass
@@ -43,6 +55,10 @@ class FrameworkProfile:
     # Directory names never scanned (build output, tooling crates). Empty = scan everything under
     # the source root, as before.
     exclude_dirs: list[str] = field(default_factory=list)
+    # How rule 06 (no business logic in boundary) measures a boundary function. "lines" (default):
+    # body length. "logic": count business-logic constructs and ignore UI calls — for immediate-mode
+    # UI (egui), where a layout function is long by nature. See content_checks._logic_points.
+    boundary_measure: str = "lines"
 
     def source_files(self, root: Path, ext: str, pattern: str | None = None):
         """root.rglob for one extension, minus exclude_dirs."""
@@ -61,11 +77,9 @@ class FrameworkProfile:
         A layer path matches whole directory names only: "Data/" matches ".../Data/x" but not
         "SwiftData/" (`import SwiftData` was read as the iOS data layer once package imports were
         matched as directories)."""
-        probe = "/" + rel_path
         for layer in self.layers:
-            for lpath in layer.paths:
-                if "/" + lpath in probe:
-                    return layer.name
+            if layer.matches(rel_path):
+                return layer.name
         return None
 
     def classify_specific(self, rel_path: str) -> str | None:
@@ -79,7 +93,7 @@ class FrameworkProfile:
             if first is not None and first not in shared:
                 return first
             for layer in self.layers:
-                if not layer.is_shared and any("/" + p in "/" + path for p in layer.paths):
+                if not layer.is_shared and layer.matches(path):
                     return layer.name
         return self.classify_file(rel_path) or self.classify_file(rel_path.rstrip("/") + "/")
 
@@ -118,6 +132,7 @@ def load_profile(profiles_dir: Path, framework: str) -> FrameworkProfile:
             name=l["name"],
             paths=l.get("paths", []),
             is_shared=l.get("is_shared", False),
+            items=l.get("items", []),
         )
         for l in data.get("layers", [])
     ]
@@ -138,4 +153,5 @@ def load_profile(profiles_dir: Path, framework: str) -> FrameworkProfile:
         module_public=(data.get("modules") or {}).get("public", []),
         import_resolver=data.get("import_resolver"),
         exclude_dirs=data.get("exclude_dirs", []),
+        boundary_measure=data.get("boundary_measure", "lines"),
     )

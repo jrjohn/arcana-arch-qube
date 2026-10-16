@@ -200,15 +200,114 @@ def _is_rust_test(rel: str) -> bool:
             or name == "tests.rs" or name.endswith("_tests.rs"))
 
 
+_STRIP_CODE = re.compile(r'"(\\.|[^"\\])*"|\'(\\.|[^\'\\])\'|//.*$')
+
+
+def blank_rust_cfg_test(lines: list[str]) -> list[str]:
+    """`lines` with every `#[cfg(test)]` item blanked (same length, so line numbers hold).
+
+    The item is whatever follows the attribute (after further attributes): `mod tests;`,
+    `mod tests { ... }`, a test-only fn or impl. Only that item goes — code after it is still
+    read (stopping at the first #[cfg(test)] would hide a non-test fn below a test helper)."""
+    out = list(lines)
+    n, i = len(lines), 0
+    while i < n:
+        s = lines[i].strip()
+        if not s.startswith("#[cfg(test)]"):
+            i += 1
+            continue
+        rest = s[len("#[cfg(test)]"):].strip()
+        j = i if rest and not rest.startswith("//") else i + 1
+        while j < n and j != i and (not lines[j].strip() or lines[j].strip().startswith(("#[", "//"))):
+            j += 1
+        end = _rust_item_end(lines, j, skip_attr=(j == i)) if j < n else n - 1
+        for k in range(i, min(end, n - 1) + 1):
+            out[k] = ""
+        i = end + 1
+    return out
+
+
+def _rust_item_end(lines: list[str], start: int, skip_attr: bool = False) -> int:
+    """0-based index of the last line of the item starting at `start`: the `;` that ends a
+    braceless item, or the brace closing its body."""
+    depth, opened = 0, False
+    for j in range(start, len(lines)):
+        code = _STRIP_CODE.sub("", lines[j])
+        if skip_attr and j == start:
+            code = code.split("]", 1)[-1]
+        for ch in code:
+            if ch == "{":
+                depth += 1
+                opened = True
+            elif ch == "}":
+                depth -= 1
+                if opened and depth == 0:
+                    return j
+            elif ch == ";" and depth == 0:
+                return j
+    return len(lines) - 1
+
+
+def _expand_use(tree: str) -> list[str]:
+    """`a::{b, c::{d, self}, e as f}` -> [a::b, a::c::d, a::c, a::e]; a glob `a::*` -> a."""
+    tree = re.sub(r"\s+", "", re.sub(r"\s+as\s+\w+", "", tree))
+    i = tree.find("{")
+    if i < 0:
+        return [tree[:-3] if tree.endswith("::*") else tree]
+    prefix, inner = tree[:i], tree[i + 1: tree.rfind("}")]
+    parts, depth, cur = [], 0, ""
+    for ch in inner:
+        if ch == "," and depth == 0:
+            parts.append(cur)
+            cur = ""
+            continue
+        depth += ch == "{"
+        depth -= ch == "}"
+        cur += ch
+    parts.append(cur)
+    out = []
+    for part in parts:
+        if not part:
+            continue
+        for leaf in _expand_use(part):
+            out.append(prefix.rstrip(":") if leaf == "self" else prefix + leaf)
+    return out
+
+
+def _rust_use_statements(lines: list[str]):
+    """(line number, is_pub, [use paths]) per `use` statement, spanning lines until its `;`."""
+    i, n = 0, len(lines)
+    while i < n:
+        m = _RUST_USE_HEAD.match(lines[i])
+        if not m:
+            i += 1
+            continue
+        start, stmt = i, lines[i][m.end():]
+        while ";" not in stmt and i + 1 < n:
+            i += 1
+            stmt += " " + _STRIP_CODE.sub("", lines[i])
+        i += 1
+        stmt = stmt.split(";", 1)[0].lstrip()
+        if stmt.startswith("::"):
+            stmt = stmt[2:]
+        yield start + 1, bool(m.group(1)), [p for p in _expand_use(stmt) if p]
+
+
+_RUST_USE_HEAD = re.compile(r"^\s*(pub(?:\([^)]*\))?\s+)?use\s+")
+
+
 def _parse_rust_imports(fpath: Path, root: Path, crates: dict[str, str]) -> list[tuple[int, str]]:
     """`use` paths resolved to project-relative module paths:
     crate::a::b -> <crate>/src/a/b, super::x -> parent module dir, other_ws_crate::a -> its dir.
+    Brace groups are expanded (`use a::{B, c::D}` is two imports), so an item-level layer can
+    tell `MenuLocation` from `MenuRegistry` in the same group.
     External crates stay as written with '::' (egui::Ui), so a layer path "egui::" can name them.
-    Parsing stops at #[cfg(test)]: the inline test module wires concrete types on purpose."""
+    #[cfg(test)] items are skipped: the inline test module wires concrete types on purpose."""
     try:
         lines = fpath.read_text(encoding="utf-8", errors="ignore").splitlines()
     except OSError:
         return []
+    lines = blank_rust_cfg_test(lines)
     rel = fpath.relative_to(root).as_posix()
     # the module directory of this file: a/b.rs is module a/b; a/mod.rs, lib.rs, main.rs are a/
     parts = rel.split("/")
@@ -216,34 +315,30 @@ def _parse_rust_imports(fpath: Path, root: Path, crates: dict[str, str]) -> list
     src_idx = max((i for i, p in enumerate(parts[:-1]) if p == "src"), default=None)
     crate_src = parts[: src_idx + 1] if src_idx is not None else parts[:-1]
     out: list[tuple[int, str]] = []
-    for i, line in enumerate(lines, 1):
-        if line.strip().startswith("#[cfg(test)]"):
-            break
-        m = _RUST_USE.match(line)
-        if not m:
-            continue
-        segs = [x for x in m.group(1).split("::") if x]
-        if not segs:
-            continue
-        head = segs[0]
-        if head == "crate":
-            base, rest = crate_src, segs[1:]
-        elif head in ("super", "self"):
-            base, rest = list(mod_dir), segs
-            while rest and rest[0] in ("super", "self"):
-                if rest.pop(0) == "super" and len(base) > len(crate_src):
-                    base = base[:-1]
-        elif head in crates:
-            base, rest = crates[head].split("/"), segs[1:]
-        elif ((root / "/".join(mod_dir) / f"{head}.rs").is_file()
-              or (root / "/".join(mod_dir) / head).is_dir()):
-            if line.lstrip().startswith("pub"):
-                continue  # a module re-exporting its own child (`pub use view::show`) is structure
-            base, rest = list(mod_dir), segs  # a child module of this one (`use shell::Shell`)
-        else:
-            out.append((i, m.group(1).lstrip(":")))
-            continue
-        out.append((i, "/".join(base + rest)))
+    for i, is_pub, paths in _rust_use_statements(lines):
+        for path in paths:
+            segs = [x for x in path.split("::") if x]
+            if not segs:
+                continue
+            head = segs[0]
+            if head == "crate":
+                base, rest = crate_src, segs[1:]
+            elif head in ("super", "self"):
+                base, rest = list(mod_dir), segs
+                while rest and rest[0] in ("super", "self"):
+                    if rest.pop(0) == "super" and len(base) > len(crate_src):
+                        base = base[:-1]
+            elif head in crates:
+                base, rest = crates[head].split("/"), segs[1:]
+            elif ((root / "/".join(mod_dir) / f"{head}.rs").is_file()
+                  or (root / "/".join(mod_dir) / head).is_dir()):
+                if is_pub:
+                    continue  # a module re-exporting its own child (`pub use view::show`) is structure
+                base, rest = list(mod_dir), segs  # a child module of this one (`use shell::Shell`)
+            else:
+                out.append((i, path.lstrip(":")))
+                continue
+            out.append((i, "/".join(base + rest)))
     return out
 
 

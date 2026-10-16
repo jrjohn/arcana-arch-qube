@@ -18,6 +18,12 @@ import_resolver: rust_workspace
 layers:
   - name: plugin_host
     paths: ["arcana-plugin-host/", "arcana-plugin-wasm/"]
+  # The plugin API's contract types — data a View may render (menu placement, setting schema,
+  # health/lifecycle state). Item-level: only these names, wherever they sit in the crate
+  # (MenuLocation shares services/menu.rs with the MenuRegistry trait, which stays plugin_api).
+  - name: plugin_contract
+    paths: ["arcana-plugin-api/"]
+    items: ["MenuLocation", "SettingField", "SettingKind", "HealthState", "PluginState"]
   - name: plugin_api
     paths: ["arcana-plugin-api/"]
   - name: view
@@ -50,17 +56,22 @@ layers:
 # traits), never the data layer. Clean Architecture below that, mirroring `cargo xtask layers`.
 allowed_dependencies:
   # plugin = a plugin crate's own model (the flowchart canvas draws its Diagram)
-  view: [viewmodel, domain, core, plugin]
-  viewmodel: [service, domain, core, plugin_api, plugin_host, plugin]
-  service: [sync, repository, dao, plugin_host, plugin_api, domain, core]
+  view: [viewmodel, domain, core, plugin, plugin_contract]
+  viewmodel: [plugin_contract, service, domain, core, plugin_api, plugin_host, plugin]
+  service: [plugin_contract, sync, repository, dao, plugin_host, plugin_api, domain, core]
   sync: [repository, dao, domain, core]
   repository: [dao, domain, core]
   dao: [domain, core]
-  plugin_host: [plugin_api, core]
-  plugin_api: [core]
-  plugin: [plugin_api, core]
+  plugin_host: [plugin_contract, plugin_api, core]
+  plugin_api: [plugin_contract, core]
+  plugin_contract: [core]
+  plugin: [plugin_contract, plugin_api, core]
   domain: [core]
-  app: [view, viewmodel, service, sync, repository, dao, plugin_host, plugin_api, plugin, domain, core]
+  app: [view, viewmodel, plugin_contract, service, sync, repository, dao, plugin_host, plugin_api, plugin, domain, core]
+
+# Rule 06 for an immediate-mode UI: a View function is scored by business-logic constructs, not
+# its length (see content_checks._logic_points).
+boundary_measure: logic
 
 import_pattern: "use\\s+(?:crate::)?([a-zA-Z0-9_:]+)"
 

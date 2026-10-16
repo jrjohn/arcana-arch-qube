@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Iterator
 
 from arch_qube.rules.models import CheckType, Violation
+from arch_qube.scanners.import_graph import blank_rust_cfg_test
 
 # Boundary = the layer that talks to the outside world.
 _BOUNDARY = {"backend": {"controller"}, "client": {"presentation", "view"}}
@@ -28,9 +29,14 @@ _SKIP_DIRS = {".git", "node_modules", "build", "dist", "target", ".gradle", ".bu
 
 
 def _is_test_path(rel: str) -> bool:
-    lower = rel.lower()
-    return any(p in lower for p in (".spec.", ".test.", "_test.", "_spec.", "mock", "stub.",
-                                    "fixture", "/test/", "/tests/", "/__tests__/"))
+    """Test code, which no content rule judges. The leading "/" makes a top-level tests/ count
+    (crates/x/tests/ did, tests/ at the scan root did not); Rust test modules are files named
+    tests.rs or *_tests.rs (`#[cfg(test)] mod tests;`), so they carry no .test. marker."""
+    lower = "/" + rel.lower()
+    name = lower.rsplit("/", 1)[-1]
+    return (any(p in lower for p in (".spec.", ".test.", "_test.", "_spec.", "mock", "stub.",
+                                     "fixture", "/test/", "/tests/", "/__tests__/"))
+            or name == "tests.rs" or name.endswith("_tests.rs"))
 
 
 def _layer_files(ctx, layers: set[str], skip_di: bool = True) -> Iterator[tuple[str, list[str]]]:
@@ -47,9 +53,12 @@ def _layer_files(ctx, layers: set[str], skip_di: bool = True) -> Iterator[tuple[
             if _content_layer(ctx.profile, rel) not in layers:
                 continue
             try:
-                yield rel, fpath.read_text(encoding="utf-8", errors="ignore").splitlines()
+                lines = fpath.read_text(encoding="utf-8", errors="ignore").splitlines()
             except OSError:
                 continue
+            if fpath.suffix == ".rs":  # inline `#[cfg(test)] mod tests { ... }` is test code too
+                lines = blank_rust_cfg_test(lines)
+            yield rel, lines
 
 
 def _content_layer(profile, rel: str) -> str | None:
@@ -175,8 +184,161 @@ def _indent_body_len(lines: list[str], start: int, indent: int) -> int:
     return end - start
 
 
+# --- rust-desktop (boundary_measure: logic): count business logic, not lines ---
+# An egui view function is a tree of ui.* calls and layout closures; 60 lines of that is a form,
+# not business logic (same reasoning as the ArkUI Column/Row exemption above). For profiles with
+# boundary_measure "logic" a view function is scored by the constructs that ARE business logic,
+# one score per code line (the heaviest construct on it), and flagged above max_logic_points:
+#
+#   3  infra call    a call through a service / repository / dao / plugin host / settings /
+#                    sync / unit-of-work handle (`self.svc.x.set(..)`, `repo.find(..)`,
+#                    `OrderService::new(..)`) — a View reaches these only through its ViewModel
+#   2  mutation      state that outlives the call: compound assignment (`total += ..`), a
+#                    collection mutator (insert/remove/pop_*/retain/clear/...) on a field or
+#                    parameter, or a field assignment — except on a UI value (a local or parameter
+#                    whose type/initialiser is an egui type: `v.panel_fill = ..` on Visuals is
+#                    styling). Filling a `let mut` Vec built in the function is output, not state.
+#   2  aggregation   a loop whose body neither draws nor emits, or .sum()/.fold()/.product()
+#   1  arithmetic    a binary + - * / % on values, unless the line is layout geometry
+#                    (rect/pos/size/width/height/spacing/x/y/zoom/... — screen math, not domain math)
+#   1  decision      an if / else-if / match arm whose body neither draws nor emits
+#                    (a branch choosing what to render is UI; one choosing what to do is logic)
+#   0  everything else — ui.*, egui::*, widget builders, closures, format!/t() display strings,
+#                    emitting Input (`out.push(..)`, `Input::X`, `vm.on(..)`, `.send(tab, msg)`),
+#                    a loop over a literal list of widgets (`for (k, v) in [..]`), and a match arm
+#                    that maps to a constant (`Route::Home => "nav.home"` is a lookup table)
+#
+# A line carrying a UI or emit token scores only its infra call, if any: drawing with a value is
+# not computing it. A service handle's .clone()/.as_ref() is not a call into the service.
+# Calibrated on arcana-desktop-rust 34747ae: every pages/*/view.rs and chrome function scores
+# <= 6; the shell's effect/command state machines (apply 39, execute 20, new 12, answer_dialog 14,
+# navigate_inner 7) score above it.
+_UI_TOKEN = re.compile(
+    r"\bui\b|egui(_\w+)?::|\bpainter\b|\|ui\||RichText|Color32|Stroke\b|\bcx\b|\bctx\b|"
+    r"\.clicked\(|\.changed\(|\.hovered\(|\.dragged\(|\.secondary_clicked\(|\bresponse\b|"
+    r"request_focus|lost_focus|has_focus|\.show\(|\bwidgets?::|\bformat!|\bt\(|\btheme::|\bicon::")
+_EMIT = re.compile(
+    r"Input::|\b(out|outs|output|inputs?|run\w*|fx|effects?|actions?|cmds|msgs|messages)\."
+    r"(push|extend)\(|\bemit\(|\.on\(|\.dispatch\(|\.send\(")
+_INFRA_CALL = re.compile(
+    r"\b(?=[a-z_])[a-z0-9_]*(svc|services?|repo|repository|repositories|dao|plugin_host|host|"
+    r"settings|db|sync|unit_of_work|uow)[a-z0-9_]*(\s*\.\s*[a-z_]\w*)*\s*(\.|::)\s*"
+    r"(?!(?:clone|as_ref|to_owned|borrow)\b)[a-z_]\w*\s*(::<[^>]*>)?\(")
+_INFRA_TYPE_CALL = re.compile(r"\b[A-Z]\w*(Service|Repository|Dao|Host|UnitOfWork)::\w+\s*\(")
+_FIELD_ASSIGN = re.compile(r"\b(self|[a-z_]\w*)((?:\.\w+)+)\s*=(?!=)")
+_COMPOUND = re.compile(r"\b\w+(?:\.\w+)*\s*[+\-*/%]=")
+_MUTATORS = (r"insert|remove|push|push_back|push_front|pop|pop_front|pop_back|retain|clear|"
+             r"truncate|extend|drain|append|take|replace|sort|sort_by|sort_by_key|dedup")
+_MUTATOR = re.compile(r"\.(" + _MUTATORS + r")\s*\(")
+_AGGREGATE = re.compile(r"\.(sum|product)\s*(::<[^>]*>)?\(\)|\.fold\(")
+_LOOP = re.compile(r"^\s*(for\b.*\bin\b|while\b|loop\b)")
+_LITERAL_LOOP = re.compile(r"^\s*for\b.*\bin\s*&?\[")
+_DECISION = re.compile(r"^\s*(\}\s*else\s+)?if\b|=>")
+_CONST_ARM = re.compile(r"=>\s*(\"[^\"]*\"|-?\d[\w.]*|true|false|None|[A-Z][\w:]*(\([^()]*\))?)\s*,?\s*$")
+_ARITH = re.compile(r"[\w)\]]\s*(?<![-=<>!])[+\-*/%](?![=>])\s*[\w(&]")
+_GEOMETRY = re.compile(
+    r"\b(rect|pos|pos2|vec2|size|width|height|w|h|x|y|dx|dy|min|max|left|right|top|bottom|"
+    r"center|origin|zoom|scale|step|spacing|margin|padding|offset|radius|stroke|angle|line|col|"
+    r"row|px|pt|font|len|available\w*|index|idx|i|j|k|n)\b", re.I)
+_UI_TYPE = re.compile(r"egui|Visuals|Style\b|\bUi\b|Frame|Painter|Response|Color32|Stroke|Rect|"
+                      r"Pos2|Vec2|Rounding|CornerRadius|Margin|Layout|TextEdit|Galley|LayoutJob|"
+                      r"Font\w*|Shape|Mesh|Shadow")
+
+
+def _code_only(line: str) -> str:
+    return re.sub(r'"(\\.|[^"\\])*"|\'(\\.|[^\'\\])\'|//.*$', '""', line)
+
+
+def _block(code: list[str], idx: int) -> list[str]:
+    """The line plus the brace block it opens (the `{` may be a few lines down, after a
+    multi-line condition or a literal array)."""
+    depth, opened = 0, False
+    for j in range(idx, min(len(code), idx + 400)):
+        for ch in code[j]:
+            if ch == "{":
+                depth += 1
+                opened = True
+            elif ch == "}":
+                depth -= 1
+                if opened and depth <= 0:
+                    return code[idx: j + 1]
+        if not opened and (j - idx > 12 or code[j].rstrip().endswith((",", ";"))):
+            break
+    return code[idx: idx + 1]
+
+
+def _draws_or_emits(lines: list[str]) -> bool:
+    return any(_UI_TOKEN.search(c) or _EMIT.search(c) for c in lines)
+
+
+def _ui_locals(code: list[str]) -> set[str]:
+    """Names bound to UI values: `v: &mut Visuals` parameters and `let mut v = Visuals::dark()`."""
+    names = set()
+    for c in code[:1]:
+        for m in re.finditer(r"\b(\w+)\s*:\s*&?(?:mut\s+)?([\w:<>' ]+)", c):
+            if _UI_TYPE.search(m.group(2)):
+                names.add(m.group(1))
+    for k, c in enumerate(code):
+        m = re.match(r"\s*let\s+(?:mut\s+)?(\w+)\s*(?::\s*([\w:<>]+))?\s*=\s*(.*)", c)
+        if m and (_UI_TYPE.search(m.group(2) or "") or _UI_TYPE.search(" ".join(code[k:k + 4]))):
+            names.add(m.group(1))
+    return names
+
+
+def _mutated(line: str) -> str | None:
+    """Receiver of the first collection mutator on the line (`self.tabs.insert(..)` -> self)."""
+    m = re.search(r"\b(\w+)(?:\.\w+)*\s*\.(?:" + _MUTATORS + r")\s*\(", line)
+    return m.group(1) if m else None
+
+
+def _logic_points(body: list[str], trace: list | None = None) -> tuple[int, dict[str, int]]:
+    """(score, {construct: count}) for one function body (header line included). `trace`, if
+    given, receives (line offset, points, construct) per scoring line."""
+    code = [_code_only(l) for l in body]
+    ui_locals = _ui_locals(code)
+    fn_locals = {m.group(1) for c in code
+                 if (m := re.match(r"\s*let\s+mut\s+(\w+)\b", c))}
+    hits: dict[str, int] = {}
+    score = 0
+    for idx, c in enumerate(code[1:], 1):
+        s = c.strip()
+        if not s or s.startswith(("#[",)):
+            continue
+        cands: list[tuple[int, str]] = []
+        if _INFRA_CALL.search(c) or _INFRA_TYPE_CALL.search(c):
+            cands.append((3, "infra call"))
+        if not (_UI_TOKEN.search(c) or _EMIT.search(c)):
+            if _LOOP.match(c):
+                if not _LITERAL_LOOP.match(c) and not _draws_or_emits(_block(code, idx)):
+                    cands.append((2, "aggregation"))
+            elif _AGGREGATE.search(c):
+                cands.append((2, "aggregation"))
+            fa = _FIELD_ASSIGN.search(c)
+            if _COMPOUND.search(c):
+                if not _GEOMETRY.search(c):  # `x += step` on a screen coordinate is layout
+                    cands.append((2, "mutation"))
+            elif (_MUTATOR.search(c) and _mutated(c) not in fn_locals) or (
+                    fa and fa.group(1) not in ui_locals):
+                cands.append((2, "mutation"))
+            if _DECISION.search(c) and not _CONST_ARM.search(c) \
+                    and not _draws_or_emits(_block(code, idx)):
+                cands.append((1, "decision"))
+            rhs = c.split("=", 1)[-1] if re.search(r"[^=!<>]=[^=]", c) else c
+            if _ARITH.search(rhs) and not _GEOMETRY.search(c) and "->" not in c:
+                cands.append((1, "arithmetic"))
+        if cands:
+            w, kind = max(cands)
+            if trace is not None:
+                trace.append((idx, w, kind))
+            score += w
+            hits[kind] = hits.get(kind, 0) + 1
+    return score, hits
+
+
 def check_boundary_complexity(ctx, check) -> list[Violation]:
     max_lines = int(check.params.get("max_method_lines", 20))
+    max_logic = int(check.params.get("max_logic_points", 6))
+    by_logic = getattr(ctx.profile, "boundary_measure", "lines") == "logic"
     out = []
     for rel, lines in _layer_files(ctx, _boundary_layers(ctx)):
         # ViewModels are where client logic is supposed to live (rule 06 is about the View), and
@@ -199,6 +361,16 @@ def check_boundary_complexity(ctx, check) -> list[Violation]:
                 n = _indent_body_len(lines, idx, len(m.group(1)))
             else:
                 n = _brace_body_len(lines, idx)
+            if by_logic:
+                pts, hits = _logic_points(lines[idx: idx + n])
+                if pts > max_logic:
+                    what = ", ".join(f"{k} x{v}" for k, v in sorted(hits.items()))
+                    out.append(_v(rel, idx + 1,
+                                  f"Business logic in boundary method '{name}': {pts} logic points "
+                                  f"(max {max_logic}; {what})",
+                                  "Move the decisions, calculations and service calls into the "
+                                  "ViewModel; keep the View to drawing State and emitting Input."))
+                continue
             if n > max_lines:
                 out.append(_v(rel, idx + 1,
                               f"{n}-line method '{name}' in boundary "
