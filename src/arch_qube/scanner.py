@@ -66,7 +66,7 @@ def run_ast_scan(
     file_count = sum(
         1
         for ext in profile.file_extensions
-        for _ in source_root.rglob(f"*{ext}")
+        for _ in profile.source_files(source_root, ext)
     )
 
     # Build import graph once — shared across import-based rules

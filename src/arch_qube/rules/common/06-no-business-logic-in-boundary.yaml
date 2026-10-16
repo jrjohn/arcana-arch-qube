@@ -13,6 +13,8 @@ ast_checks:
     description: "Controller/View methods should be simple delegation"
     params:
       max_method_lines: 20
+      # profiles with boundary_measure: logic (rust-desktop) score business-logic constructs instead
+      max_logic_points: 6
 
 ai_checks:
   - type: semantic_review

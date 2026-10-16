@@ -1,0 +1,84 @@
+# Rust desktop client: egui + Clean Architecture + MVVM-UDF (reference: arcana-desktop-rust).
+# A Cargo workspace: layers are crates, and inside the UI crate layers are files —
+# pages/<page>/view.rs is the View, pages/<page>/mod.rs (State/Input/reduce) and task.rs
+# (effect runner) are the ViewModel. `use` paths are resolved to files (import_resolver) so imports
+# are classified by the same paths as the files themselves.
+framework: rust-desktop
+platform: desktop
+category: client
+
+source_roots: ["."]
+file_extensions: [".rs"]
+exclude_dirs: ["target", "xtask", ".git", "dist", "packaging", "scripts", "docs"]
+import_resolver: rust_workspace
+
+# Order matters: the first layer whose path appears wins. The plugin crates come first (their
+# services/view.rs is a plugin ViewService, not a View), then the UI files before the crate-level
+# fallbacks ("arcana-ui/" -> viewmodel, "arcana-data/" -> dao).
+layers:
+  - name: plugin_host
+    paths: ["arcana-plugin-host/", "arcana-plugin-wasm/"]
+  # The plugin API's contract types — data a View may render (menu placement, setting schema,
+  # health/lifecycle state). Item-level: only these names, wherever they sit in the crate
+  # (MenuLocation shares services/menu.rs with the MenuRegistry trait, which stays plugin_api).
+  - name: plugin_contract
+    paths: ["arcana-plugin-api/"]
+    items: ["MenuLocation", "SettingField", "SettingKind", "HealthState", "PluginState"]
+  - name: plugin_api
+    paths: ["arcana-plugin-api/"]
+  - name: view
+    paths: ["view.rs", "view/", "arcana-ui/src/shell/", "arcana-ui/src/widgets",
+            "arcana-ui/src/theme", "arcana-ui/src/fonts", "plugins/flowchart/src/ui/",
+            # the GUI toolkit itself: only the View may touch it
+            "egui::", "eframe::", "egui_extras::", "egui_plot::"]
+  - name: viewmodel
+    paths: ["arcana-ui/", "plugins/flowchart/src/vm"]
+  - name: app
+    paths: ["arcana-app/"]
+  - name: service
+    paths: ["arcana-infra/"]
+  - name: sync
+    paths: ["arcana-sync/"]
+  - name: repository
+    paths: ["arcana-data/src/repository", "arcana-data/src/unit_of_work"]
+  - name: dao
+    paths: ["arcana-data/"]
+  - name: plugin
+    paths: ["plugins/", "plugins-wasm/"]
+  - name: domain
+    paths: ["arcana-domain/"]
+  - name: core
+    paths: ["arcana-core/"]
+    is_shared: true
+
+# MVVM-UDF: View renders State and emits Input — it knows only its ViewModel (and the domain values
+# State is made of). The ViewModel reaches the outside world only through services (domain/infra
+# traits), never the data layer. Clean Architecture below that, mirroring `cargo xtask layers`.
+allowed_dependencies:
+  # plugin = a plugin crate's own model (the flowchart canvas draws its Diagram)
+  view: [viewmodel, domain, core, plugin, plugin_contract]
+  viewmodel: [plugin_contract, service, domain, core, plugin_api, plugin_host, plugin]
+  service: [plugin_contract, sync, repository, dao, plugin_host, plugin_api, domain, core]
+  sync: [repository, dao, domain, core]
+  repository: [dao, domain, core]
+  dao: [domain, core]
+  plugin_host: [plugin_contract, plugin_api, core]
+  plugin_api: [plugin_contract, core]
+  plugin_contract: [core]
+  plugin: [plugin_contract, plugin_api, core]
+  domain: [core]
+  app: [view, viewmodel, plugin_contract, service, sync, repository, dao, plugin_host, plugin_api, plugin, domain, core]
+
+# Rule 06 for an immediate-mode UI: a View function is scored by business-logic constructs, not
+# its length (see content_checks._logic_points).
+boundary_measure: logic
+
+import_pattern: "use\\s+(?:crate::)?([a-zA-Z0-9_:]+)"
+
+# Composition roots: the only places that may wire concrete types across layers.
+di_container_files:
+  - "**/arcana-app/src/main.rs"
+  - "**/arcana-app/src/bootstrap.rs"
+  - "**/arcana-infra/src/wiring.rs"
+  # a crate root only declares and re-exports its modules (its public API), it does not use them
+  - "**/lib.rs"
