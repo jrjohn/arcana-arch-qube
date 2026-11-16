@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.1...v0.5.2) (2026-11-16)
+
+
+### Bug Fixes
+
+* **rule-16:** 用內容判斷 HTTP handler 是否在 controller 層(handlers_in_controller) ([#16](https://github.com/jrjohn/arcana-arch-qube/issues/16)) ([9c849db](https://github.com/jrjohn/arcana-arch-qube/commit/9c849dba8a7d94dec7cced2614eed70f1832a008))
+
 ## [0.5.1](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.0...v0.5.1) (2026-11-16)
 
 
