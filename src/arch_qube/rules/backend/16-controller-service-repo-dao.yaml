@@ -12,6 +12,9 @@ ast_checks:
   - type: file_structure
     check: "layer_dirs_exist"
     description: "All backend layer directories must exist"
+  - type: pattern_match
+    check: "handlers_in_controller"
+    description: "HTTP handlers must live in the controller layer (judged by content, not path)"
   - type: import_direction
     check: "no_upward_imports"
     description: "No reverse imports in backend layers"
