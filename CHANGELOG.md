@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.0...v0.5.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* fail unlayered backends instead of a free 100, require DB evidence for bare .execute/.query ([#14](https://github.com/jrjohn/arcana-arch-qube/issues/14)) ([405a91a](https://github.com/jrjohn/arcana-arch-qube/commit/405a91a20ea20d20c73e092652cf5ce92abe27e5))
+
 ## [0.5.0](https://github.com/jrjohn/arcana-arch-qube/compare/v0.4.1...v0.5.0) (2026-10-16)
 
 
