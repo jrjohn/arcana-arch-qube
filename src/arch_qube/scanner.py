@@ -42,6 +42,7 @@ HANDLERS: dict[str, Handler] = {
     "impl_in_subdir": lambda c, _: check_impl_colocation(c.source_root, c.profile),
     "impl_naming_convention": lambda c, _: check_impl_naming(c.source_root, c.profile),
     "layer_dirs_exist": lambda c, _: check_layer_exists(c.source_root, c.profile),
+    "handlers_in_controller": cc.check_handlers_in_controller,
     "boundary_uses_dto": cc.check_boundary_uses_dto,
     "boundary_complexity": cc.check_boundary_complexity,
     "test_dir_exists": cc.check_test_dir_exists,

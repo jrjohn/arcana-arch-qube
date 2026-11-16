@@ -593,3 +593,59 @@ def check_module_public_api_only(ctx, check) -> list[Violation] | None:
                       f"Module '{src}' reaches into '{tgt}' internals: '{e.target_import}'",
                       f"Expose what is needed from '{tgt}' through its public API ({', '.join(public)})."))
     return out
+
+
+# ---------- 16 controller-service-repo-dao: web handlers must live in the controller layer ----------
+#
+# 2026-11-16: Desktop KM scored 99.4 PASS. Four template crates had controller/service/repository/dao,
+# so the project counted as layered — while the 13 crates doing the real work had no layers at all and
+# a 2,901-line routes.rs held 30 axum handlers with the business logic inline. Layer rules classify by
+# PATH, so files outside every layer were invisible to them. This check looks at CONTENT: a file that
+# defines HTTP handlers is boundary code, wherever it sits.
+
+# axum extractors in a fn signature. Narrow on purpose (critical rule): a plain fn taking `Path`
+# from std does not match, because the extractor form is `Path(x): Path<T>` / `State(s): State<T>`.
+_RUST_HANDLER_SIG = re.compile(
+    r"\b(?:State|Json|Query|Path|Form|Extension)\s*\(\s*[A-Za-z_(][^)]*\)\s*:\s*(?:axum::extract::)?"
+    r"(?:State|Json|Query|Path|Form|Extension)\s*<")
+_RUST_ASYNC_FN = re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?async\s+fn\s+(\w+)")
+
+
+def _rust_handlers(lines: list[str]) -> list[tuple[int, str]]:
+    """(line, name) of async fns whose signature uses an axum extractor."""
+    found = []
+    for i, line in enumerate(lines):
+        m = _RUST_ASYNC_FN.match(line)
+        if not m:
+            continue
+        sig = []
+        for j in range(i, min(i + 30, len(lines))):  # signature up to the opening brace
+            sig.append(lines[j])
+            if "{" in lines[j]:
+                break
+        if _RUST_HANDLER_SIG.search(" ".join(sig)):
+            found.append((i + 1, m.group(1)))
+    return found
+
+
+def check_handlers_in_controller(ctx, _check) -> "list[Violation] | None":
+    """Rust/axum only for now; other languages: not applicable (None, so the check is not counted
+    as a pass it never made)."""
+    if ".rs" not in ctx.profile.file_extensions or ctx.profile.category != "backend":
+        return None
+    out: list[Violation] = []
+    for fpath in ctx.profile.source_files(ctx.source_root, ".rs"):
+        rel = str(fpath.relative_to(ctx.source_root))
+        if _is_test_path(rel) or _content_layer(ctx.profile, rel) == "controller":
+            continue
+        try:
+            lines = blank_rust_cfg_test(fpath.read_text(encoding="utf-8", errors="ignore").splitlines())
+        except OSError:
+            continue
+        hs = _rust_handlers(lines)
+        if hs:
+            names = ", ".join(n for _, n in hs[:5]) + (" …" if len(hs) > 5 else "")
+            out.append(_v(rel, hs[0][0],
+                          f"未分層的 HTTP handler:{len(hs)} 個({names})不在 controller 層",
+                          "把 handler 移到 controller 層,業務邏輯移到 service(trait + impl/)"))
+    return out
