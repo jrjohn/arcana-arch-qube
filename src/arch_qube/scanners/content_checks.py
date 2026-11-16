@@ -465,16 +465,57 @@ def _compile_patterns(patterns: list[str]) -> list[re.Pattern]:
     return out
 
 
+# Generic call names that are only database access when the file shows database evidence:
+# `exec.execute(` on an MCP tool executor matched ".execute(" (2026-11-16 false positive).
+_WEAK_DB_PATTERNS = {".query(", ".execute("}
+_DB_EVIDENCE = re.compile(
+    r"sqlx|diesel|sea_orm|\bquery(_as|_scalar)?!|Executor<|MySqlPool|PgPool|SqlitePool|AnyPool|"
+    r"JdbcTemplate|EntityManager|\bknex\b|PrismaClient|\*sql\.DB|\*gorm\.DB|"
+    r"[\"'`]\s*(SELECT\s.+\sFROM|INSERT\s+INTO|UPDATE\s+\w+\s+SET|DELETE\s+FROM)\b", re.I)
+
+
+def _split_patterns(check) -> tuple[list[re.Pattern], list[re.Pattern]]:
+    raw = check.params.get("forbidden_patterns", [])
+    strong = _compile_patterns([p for p in raw if p not in _WEAK_DB_PATTERNS])
+    weak = _compile_patterns([p for p in raw if p in _WEAK_DB_PATTERNS])
+    return strong, weak
+
+
+def _db_hits(rel: str, lines: list[str], strong, weak, message: str) -> list[Violation]:
+    evidence = any(_DB_EVIDENCE.search(line) for _, line in _code_lines(lines))
+    out = []
+    for n, line in _code_lines(lines):
+        if any(p.search(line) for p in strong) or (evidence and any(p.search(line) for p in weak)):
+            out.append(_v(rel, n, f"{message}: '{line.strip()[:80]}'",
+                          "Move the query into a Repository and call it through its interface."))
+    return out
+
+
 def check_no_db_in_service(ctx, check) -> list[Violation]:
-    pats = _compile_patterns(check.params.get("forbidden_patterns", []))
+    strong, weak = _split_patterns(check)
     out = []
     for rel, lines in _layer_files(ctx, {"service"}, skip_di=False):
-        for n, line in _code_lines(lines):
-            for p in pats:
-                if p.search(line):
-                    out.append(_v(rel, n, f"Database access in service layer: '{line.strip()[:80]}'",
-                                  "Move the query into a Repository and call it through its interface."))
-                    break
+        out.extend(_db_hits(rel, lines, strong, weak, "Database access in service layer"))
+    return out
+
+
+def check_db_outside_repository(ctx, check) -> list[Violation]:
+    """Unlayered backend: every file that is not repository/dao and still runs SQL is a violation."""
+    strong, weak = _split_patterns(check)
+    out = []
+    for ext in ctx.profile.file_extensions:
+        for fpath in ctx.profile.source_files(ctx.source_root, ext):
+            rel = str(fpath.relative_to(ctx.source_root))
+            if _is_test_path(rel) or _content_layer(ctx.profile, rel) in {"repository", "dao"}:
+                continue
+            try:
+                lines = fpath.read_text(encoding="utf-8", errors="ignore").splitlines()
+            except OSError:
+                continue
+            if fpath.suffix == ".rs":
+                lines = blank_rust_cfg_test(lines)
+            out.extend(_db_hits(rel, lines, strong, weak,
+                                "Database access outside a repository/dao layer (project has no layers)"))
     return out
 
 
