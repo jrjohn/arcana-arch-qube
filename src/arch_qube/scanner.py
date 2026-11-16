@@ -53,6 +53,34 @@ HANDLERS: dict[str, Handler] = {
 }
 
 
+# Checks that only mean something when files are classified into layers. In a backend project with
+# no recognisable layers they find nothing to look at and used to report "0 violations" = 100%
+# (2026-11-16: a flat crate with raw SQL in db.rs scored 100 PASS). They are "not evaluated" then.
+_LAYER_DEPENDENT = {
+    "no_upward_imports", "no_skip_imports", "impl_import_only_di", "impl_in_subdir",
+    "boundary_uses_dto", "boundary_complexity", "view_no_service_import",
+    "transaction_placement", "module_public_api_only",
+}
+_BACKEND_CHAIN = ("controller", "service", "repository", "dao")
+
+
+def detected_backend_layers(source_root: Path, profile: FrameworkProfile) -> set[str]:
+    """Backend chain layers that at least one source file is classified into."""
+    found: set[str] = set()
+    for ext in profile.file_extensions:
+        for fpath in profile.source_files(source_root, ext):
+            layer = profile.classify_specific(str(fpath.relative_to(source_root)))
+            if layer in _BACKEND_CHAIN:
+                found.add(layer)
+    return found
+
+
+def is_unlayered(source_root: Path, profile: FrameworkProfile) -> bool:
+    """A backend project in which no file is classified into any chain layer is not layered at all.
+    (Fewer-than-two would also catch the single-layer fixtures that content rules are tested on.)"""
+    return profile.category == "backend" and not detected_backend_layers(source_root, profile)
+
+
 def run_ast_scan(
     source_root: Path,
     profile: FrameworkProfile,
@@ -72,6 +100,7 @@ def run_ast_scan(
     # Build import graph once — shared across import-based rules
     ctx = ScanContext(source_root, profile, build_import_graph(source_root, profile),
                       project_root or source_root)
+    unlayered = is_unlayered(source_root, profile)
 
     for rule in rules:
         # Skip rules that don't apply to this framework
@@ -88,7 +117,23 @@ def run_ast_scan(
             if handler is None:
                 unimplemented.append(check.check)
                 continue
-            found = handler(ctx, check)
+            if unlayered and check.check in _LAYER_DEPENDENT:
+                declined += 1  # nothing is classified into layers: this check would look at nothing
+                continue
+            if unlayered and check.check == "layer_dirs_exist":
+                found = [Violation(
+                    file=".", line=0,
+                    message="未分層：找不到 controller/service/repository 任何一層 (no backend layers "
+                            f"detected; found {sorted(detected_backend_layers(source_root, profile)) or 'none'})",
+                    suggestion="Split the code into controller -> service -> repository -> dao layers.",
+                    check_type=CheckType.AST)]
+                violations.extend(found)
+                ran += 1
+                continue
+            if unlayered and check.check == "no_db_in_service":
+                found = cc.check_db_outside_repository(ctx, check)
+            else:
+                found = handler(ctx, check)
             if found is None:  # the check does not apply to this project (e.g. it has no modules)
                 declined += 1
                 continue
@@ -106,7 +151,9 @@ def run_ast_scan(
 
         # Calculate compliance. A boolean rule ("a test suite exists") is all or nothing; scoring
         # it by violating-file share would turn "missing" into ~99%.
-        if rule.scoring_method == "boolean":
+        if unlayered and any(c.check == "layer_dirs_exist" for c in rule.ast_checks):
+            compliance = 0.0  # the layer chain does not exist at all
+        elif rule.scoring_method == "boolean":
             compliance = 0.0 if unique_violations else 100.0
         elif file_count > 0:
             violating_files = len(set(v.file for v in unique_violations))
