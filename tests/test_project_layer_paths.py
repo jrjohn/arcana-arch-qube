@@ -81,3 +81,4 @@ def test_dip_ports_is_project_opt_in(tmp_path):
     assert prof.dip_ports == ["repository"] and applied["dip_ports"] == ["repository"]
     with pytest.raises(ValueError, match="dip_ports"):
         apply_project_layers(_profile(), _cfg(tmp_path, "dip_ports: [repo]\n"))
+

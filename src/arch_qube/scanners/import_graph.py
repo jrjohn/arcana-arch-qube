@@ -56,6 +56,13 @@ def build_import_graph(
     return edges
 
 
+def _below(source: str, target: str, order: list[str]) -> bool:
+    """source sits below target in the layer order (dao below repository). Only a lower layer
+    implements an upper port; controller -> repository is still skipping a layer
+    (2026-11-17: dip_ports let arcana-grpc's controller import UserRepository unflagged)."""
+    return source in order and target in order and order.index(source) > order.index(target)
+
+
 def check_layer_direction(
     edges: list[ImportEdge],
     profile: FrameworkProfile,
@@ -74,8 +81,9 @@ def check_layer_direction(
             continue
 
         if not profile.is_allowed_dependency(edge.source_layer, edge.target_layer):
-            if edge.target_layer in profile.dip_ports and not _is_impl_target(edge.target_import):
-                continue  # implementing an upper layer's interface (dependency inversion)
+            if (edge.target_layer in profile.dip_ports and not _is_impl_target(edge.target_import)
+                    and _below(edge.source_layer, edge.target_layer, layer_order)):
+                continue  # a LOWER layer implementing an upper layer's interface (dependency inversion)
             violations.append(Violation(
                 file=edge.source_file,
                 line=edge.line,

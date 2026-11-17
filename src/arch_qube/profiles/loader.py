@@ -95,6 +95,9 @@ class FrameworkProfile:
         trailing slash (Go imports a directory) is matched as a directory. internal/domain/service
         is the service layer, not domain — whatever order the profile lists its layers in."""
         shared = {l.name for l in self.layers if l.is_shared}
+        # Several layer paths in one file path: the one nearest the file wins.
+        # arcana-repository/src/dao/x.rs is dao, not repository (2026-11-17: every dao/ file in a
+        # repository crate was classified as repository, so the dao layer was invisible).
         for path in (rel_path, rel_path.rstrip("/") + "/"):
             first = self.classify_file(path)
             if first is not None and first not in shared:
