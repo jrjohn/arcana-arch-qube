@@ -84,3 +84,10 @@ def test_layer_paths_match_whole_directory_names():
     assert ios.classify_specific("SwiftData") is None          # Apple framework, not Data/
     assert ios.classify_specific("ArcanaData/Repo.swift") == "data"
     assert ios.classify_specific("Sources/Data/Repo.swift") == "data"
+
+
+def test_dependency_inversion_does_not_let_a_higher_layer_skip_down(tmp_path):
+    from arch_qube.scanners.import_graph import _below
+    order = ["controller", "service", "repository", "dao"]
+    assert _below("dao", "repository", order)
+    assert not _below("controller", "repository", order)

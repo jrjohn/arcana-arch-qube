@@ -105,6 +105,20 @@ def scan(
         console.print(f"[red]Error:[/red] {e}")
         sys.exit(2)
 
+    # Project-declared layers (arch-qube.yaml next to / above the scanned directory)
+    from arch_qube.profiles.loader import apply_project_layers, find_project_config
+    project_cfg = find_project_config(source_root)
+    if project_cfg is not None:
+        try:
+            applied = apply_project_layers(profile, project_cfg)
+        except ValueError as e:
+            console.print(f"[red]Error:[/red] {e}")
+            sys.exit(2)
+        if applied:
+            console.print(f"[dim]Project layers from {project_cfg}:[/dim]")
+            for name, paths in applied.items():
+                console.print(f"[dim]  {name}: {', '.join(paths)}[/dim]")
+
     # Load rules
     rules = load_rules(r_dir)
     if not rules:

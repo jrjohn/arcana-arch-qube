@@ -59,6 +59,10 @@ class FrameworkProfile:
     # body length. "logic": count business-logic constructs and ignore UI calls — for immediate-mode
     # UI (egui), where a layout function is long by nature. See content_checks._logic_points.
     boundary_measure: str = "lines"
+    # Project-declared layers (arch-qube.yaml `layer_paths`). Consulted only when the built-in
+    # layers match nothing, so a project can bring unlayered code UNDER the rules but can never
+    # move a file out of the layer its path already puts it in.
+    fallback_layers: list[LayerDef] = field(default_factory=list)
 
     def source_files(self, root: Path, ext: str, pattern: str | None = None):
         """root.rglob for one extension, minus exclude_dirs."""
@@ -80,6 +84,9 @@ class FrameworkProfile:
         for layer in self.layers:
             if layer.matches(rel_path):
                 return layer.name
+        for layer in self.fallback_layers:
+            if layer.matches(rel_path):
+                return layer.name
         return None
 
     def classify_specific(self, rel_path: str) -> str | None:
@@ -88,6 +95,9 @@ class FrameworkProfile:
         trailing slash (Go imports a directory) is matched as a directory. internal/domain/service
         is the service layer, not domain — whatever order the profile lists its layers in."""
         shared = {l.name for l in self.layers if l.is_shared}
+        # Several layer paths in one file path: the one nearest the file wins.
+        # arcana-repository/src/dao/x.rs is dao, not repository (2026-11-17: every dao/ file in a
+        # repository crate was classified as repository, so the dao layer was invisible).
         for path in (rel_path, rel_path.rstrip("/") + "/"):
             first = self.classify_file(path)
             if first is not None and first not in shared:
@@ -155,3 +165,53 @@ def load_profile(profiles_dir: Path, framework: str) -> FrameworkProfile:
         exclude_dirs=data.get("exclude_dirs", []),
         boundary_measure=data.get("boundary_measure", "lines"),
     )
+
+
+PROJECT_CONFIG = "arch-qube.yaml"
+
+
+def find_project_config(start: Path) -> Path | None:
+    """arch-qube.yaml in `start` or the nearest parent, stopping at the repository root (.git)."""
+    d = start.resolve()
+    while True:
+        cand = d / PROJECT_CONFIG
+        if cand.is_file():
+            return cand
+        if (d / ".git").exists() or d.parent == d:
+            return None
+        d = d.parent
+
+
+def apply_project_layers(profile: FrameworkProfile, config: Path) -> dict[str, list[str]]:
+    """Read `layer_paths: {layer: [path, ...]}` from a project's arch-qube.yaml into
+    profile.fallback_layers. Returns what was applied (for the report). Unknown layer names are an
+    error: a typo would otherwise silently leave the code unlayered — the very gap this closes.
+
+    2026-11-17: Desktop KM's 14 domain crates (arcana-vault-index, -organize, ...) matched no
+    layer path, so no rule looked at ~120 files and the scan still said 99.5 PASS."""
+    data = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
+    raw = data.get("layer_paths") or {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"{config}: layer_paths must be a mapping of layer -> [paths]")
+    known = set(profile.get_layer_order())
+    applied: dict[str, list[str]] = {}
+    for name, paths in raw.items():
+        if name not in known:
+            raise ValueError(f"{config}: unknown layer '{name}' (known: {sorted(known)})")
+        if isinstance(paths, str):
+            paths = [paths]
+        paths = [p if p.endswith("/") else p + "/" for p in paths]
+        profile.fallback_layers.append(LayerDef(name=name, paths=paths))
+        applied[name] = paths
+    # Dependency inversion is opt-in per project (no bundled profile turns it on): a project whose
+    # data-access adapters implement repository ports declares it here, visibly.
+    dip = data.get("dip_ports") or []
+    if isinstance(dip, str):
+        dip = [dip]
+    for name in dip:
+        if name not in known:
+            raise ValueError(f"{config}: unknown layer '{name}' in dip_ports (known: {sorted(known)})")
+    if dip:
+        profile.dip_ports = list(dip)
+        applied["dip_ports"] = list(dip)
+    return applied
