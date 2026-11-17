@@ -200,4 +200,15 @@ def apply_project_layers(profile: FrameworkProfile, config: Path) -> dict[str, l
         paths = [p if p.endswith("/") else p + "/" for p in paths]
         profile.fallback_layers.append(LayerDef(name=name, paths=paths))
         applied[name] = paths
+    # Dependency inversion is opt-in per project (no bundled profile turns it on): a project whose
+    # data-access adapters implement repository ports declares it here, visibly.
+    dip = data.get("dip_ports") or []
+    if isinstance(dip, str):
+        dip = [dip]
+    for name in dip:
+        if name not in known:
+            raise ValueError(f"{config}: unknown layer '{name}' in dip_ports (known: {sorted(known)})")
+    if dip:
+        profile.dip_ports = list(dip)
+        applied["dip_ports"] = list(dip)
     return applied

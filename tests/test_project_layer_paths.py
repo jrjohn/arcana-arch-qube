@@ -72,3 +72,12 @@ def test_declared_service_crate_is_checked_by_service_rules(tmp_path):
     prof = _profile()
     apply_project_layers(prof, _cfg(tmp_path, "layer_paths:\n  service: [vault-index]\n"))
     assert db_hits(prof)
+
+
+def test_dip_ports_is_project_opt_in(tmp_path):
+    prof = _profile()
+    assert prof.dip_ports == []
+    applied = apply_project_layers(prof, _cfg(tmp_path, "dip_ports: [repository]\n"))
+    assert prof.dip_ports == ["repository"] and applied["dip_ports"] == ["repository"]
+    with pytest.raises(ValueError, match="dip_ports"):
+        apply_project_layers(_profile(), _cfg(tmp_path, "dip_ports: [repo]\n"))
