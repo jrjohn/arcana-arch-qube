@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.2...v0.5.3) (2026-11-22)
+
+
+### Bug Fixes
+
+* **rust:** import 解析真的開起來 + arch-qube.yaml layer_paths ([#18](https://github.com/jrjohn/arcana-arch-qube/issues/18)) ([ecb453d](https://github.com/jrjohn/arcana-arch-qube/commit/ecb453da74df2ce429931550e58baad27aa118a2))
+
 ## [0.5.2](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.1...v0.5.2) (2026-11-16)
 
 
