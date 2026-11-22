@@ -30,11 +30,19 @@ allowed_dependencies:
   service: [repository, domain, core]
   repository: [dao, domain, core]
   dao: [domain, core]
+  # Shared kernel: domain types may use core's result/id/entity primitives (arcana-core's own
+  # domain/ module imports crate::ArcanaResult). Before import resolution worked this never fired.
+  domain: [core]
 
 import_pattern: "use\\s+(?:crate::)?([a-zA-Z0-9_:]+)"
+# `use other_crate::x` → that workspace crate's directory, so imports are classified by the same
+# layer paths as files. Without it (until 2026-11-17) every cross-crate import had target layer
+# None: 1,543 edges in Desktop KM, and layer-direction / repository-no-service checked nothing.
+import_resolver: rust_workspace
 
 di_container_files:
   - "**/main.rs"
   - "**/lib.rs"
   - "**/container.rs"
+  - "**/di.rs"
   - "**/mod.rs"
