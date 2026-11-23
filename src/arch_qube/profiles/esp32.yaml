@@ -3,7 +3,7 @@ platform: embedded
 category: client
 
 source_roots: ["main", "components"]
-file_extensions: [".hpp", ".cpp", ".h"]
+file_extensions: [".hpp", ".cpp", ".h", ".c"]
 
 layers:
   - name: service
