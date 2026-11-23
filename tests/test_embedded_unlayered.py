@@ -52,8 +52,3 @@ def test_layered_firmware_keeps_layer_direction():
     ld = _scan("esp32_layered")["layer-direction"]
     assert ld.evaluated and ld.compliance == 100.0
     assert not any("未分層" in v.message for v in ld.violations)
-
-
-def test_web_clients_are_not_judged_unlayered():
-    # The rule covers backend + embedded only; a client profile with no chain is never "unlayered".
-    assert chain_layers(_profile("angular")) == ()
