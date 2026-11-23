@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.3...v0.5.4) (2026-11-23)
+
+
+### Bug Fixes
+
+* **esp32:** 掃 .c 檔,扁平韌體判未分層而不是白送分數 ([#21](https://github.com/jrjohn/arcana-arch-qube/issues/21)) ([0de3ebf](https://github.com/jrjohn/arcana-arch-qube/commit/0de3ebff27d29daa6113d98cf6e09d86d8334e41))
+
 ## [0.5.3](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.2...v0.5.3) (2026-11-22)
 
 
