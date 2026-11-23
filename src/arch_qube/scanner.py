@@ -65,21 +65,43 @@ _LAYER_DEPENDENT = {
 _BACKEND_CHAIN = ("controller", "service", "repository", "dao")
 
 
+def chain_layers(profile: FrameworkProfile) -> tuple[str, ...]:
+    """Layers a project of this kind must have at least one file in to count as layered.
+    Backend: the controller/service/repository/dao chain. Embedded: the profile's own non-shared
+    layers (esp32: service, driver) -- everything else in main/ is the shared core layer, so a
+    flat main/*.c firmware classifies every file as core and used to pass every layer rule
+    (2026-11-23: iNAPLink, 5,900 lines of flat C, 90/100). Other clients: not judged here."""
+    if profile.category == "backend":
+        return _BACKEND_CHAIN
+    if profile.platform == "embedded":
+        return tuple(l.name for l in profile.layers if not l.is_shared)
+    return ()
+
+
 def detected_backend_layers(source_root: Path, profile: FrameworkProfile) -> set[str]:
-    """Backend chain layers that at least one source file is classified into."""
+    """Chain layers (see chain_layers) that at least one source file is classified into."""
+    chain = chain_layers(profile)
     found: set[str] = set()
     for ext in profile.file_extensions:
         for fpath in profile.source_files(source_root, ext):
             layer = profile.classify_specific(str(fpath.relative_to(source_root)))
-            if layer in _BACKEND_CHAIN:
+            if layer in chain:
                 found.add(layer)
     return found
 
 
 def is_unlayered(source_root: Path, profile: FrameworkProfile) -> bool:
-    """A backend project in which no file is classified into any chain layer is not layered at all.
+    """A project in which no file is classified into any chain layer is not layered at all.
     (Fewer-than-two would also catch the single-layer fixtures that content rules are tested on.)"""
-    return profile.category == "backend" and not detected_backend_layers(source_root, profile)
+    return bool(chain_layers(profile)) and not detected_backend_layers(source_root, profile)
+
+
+def unlayered_host_check(profile: FrameworkProfile) -> str:
+    """The check that reports "unlayered" and scores its rule 0. Backend: rule #16's
+    layer_dirs_exist. Embedded has no rule #16, so the common layer-direction rule carries it --
+    otherwise every layer rule would be NOT EVALUATED and a flat project would score higher
+    than a layered one with a single violation."""
+    return "layer_dirs_exist" if profile.category == "backend" else "no_upward_imports"
 
 
 def run_ast_scan(
@@ -102,6 +124,7 @@ def run_ast_scan(
     ctx = ScanContext(source_root, profile, build_import_graph(source_root, profile),
                       project_root or source_root)
     unlayered = is_unlayered(source_root, profile)
+    host_check = unlayered_host_check(profile)
 
     for rule in rules:
         # Skip rules that don't apply to this framework
@@ -118,18 +141,19 @@ def run_ast_scan(
             if handler is None:
                 unimplemented.append(check.check)
                 continue
-            if unlayered and check.check in _LAYER_DEPENDENT:
-                declined += 1  # nothing is classified into layers: this check would look at nothing
-                continue
-            if unlayered and check.check == "layer_dirs_exist":
+            if unlayered and check.check == host_check:
+                chain = chain_layers(profile)
                 found = [Violation(
                     file=".", line=0,
-                    message="未分層：找不到 controller/service/repository 任何一層 (no backend layers "
+                    message=f"未分層：找不到 {'/'.join(chain)} 任何一層 (no {'/'.join(chain)} layer "
                             f"detected; found {sorted(detected_backend_layers(source_root, profile)) or 'none'})",
-                    suggestion="Split the code into controller -> service -> repository -> dao layers.",
+                    suggestion="Split the code into layers: " + " -> ".join(chain) + ".",
                     check_type=CheckType.AST)]
                 violations.extend(found)
                 ran += 1
+                continue
+            if unlayered and check.check in _LAYER_DEPENDENT:
+                declined += 1  # nothing is classified into layers: this check would look at nothing
                 continue
             if unlayered and check.check == "no_db_in_service":
                 found = cc.check_db_outside_repository(ctx, check)
@@ -152,7 +176,7 @@ def run_ast_scan(
 
         # Calculate compliance. A boolean rule ("a test suite exists") is all or nothing; scoring
         # it by violating-file share would turn "missing" into ~99%.
-        if unlayered and any(c.check == "layer_dirs_exist" for c in rule.ast_checks):
+        if unlayered and any(c.check == host_check for c in rule.ast_checks):
             compliance = 0.0  # the layer chain does not exist at all
         elif rule.scoring_method == "boolean":
             compliance = 0.0 if unique_violations else 100.0
