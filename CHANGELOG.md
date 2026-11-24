@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.6](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.5...v0.5.6) (2026-11-24)
+
+
+### Bug Fixes
+
+* **rule03:** esp32 DI 容器只剩組裝根,Impl 只准引自己的標頭 ([#27](https://github.com/jrjohn/arcana-arch-qube/issues/27)) ([218508b](https://github.com/jrjohn/arcana-arch-qube/commit/218508b15f01a2b8570dc5b56b9387ce2baae6df))
+
 ## [0.5.5](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.4...v0.5.5) (2026-11-24)
 
 
