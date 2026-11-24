@@ -1,8 +1,68 @@
 """Load framework profile from YAML."""
 from __future__ import annotations
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
+import re
 import yaml
+
+
+@lru_cache(maxsize=None)
+def _segment_glob(path: str) -> re.Pattern[str]:
+    """A layer path with `*` (one directory-name fragment, never crossing "/"), anchored at a
+    directory boundary; each globbed segment is a capture group. "*-rest/" matches
+    ".../demo-rest/x" and ".../arcana-rest/x" but not ".../demo-rest-old/x"."""
+    parts = []
+    for seg in path.split("/"):
+        if "*" in seg:
+            parts.append("(" + re.escape(seg).replace(r"\*", "[^/]*") + ")")
+        else:
+            parts.append(re.escape(seg))
+    return re.compile("/" + "/".join(parts))
+
+
+def path_matches(probe: str, path: str, local_dirs: frozenset[str] | None = None) -> bool:
+    """probe is "/" + a relative path. A plain layer path is a substring match at a directory
+    boundary (as always); one containing `*` is a segment glob — so a profile can recognise a
+    workspace crate / module by its role ("*-rest/", "*Data/") instead of a template's literal
+    name ("arcana-rest/", "ArcanaData/"), and a product renamed from the template classifies
+    identically.
+
+    A globbed segment names one of the project's OWN directories: when the scan knows them
+    (local_dirs), a segment that is not one of them does not match. Otherwise "*Data/" would read
+    `import SwiftData` / `import CoreData` as the iOS data layer."""
+    if "*" not in path:
+        return "/" + path in probe
+    for m in _segment_glob(path).finditer(probe):
+        if local_dirs is None or all(g in local_dirs for g in m.groups()):
+            return True
+    return False
+
+
+_NEVER_LOCAL = {".git", "node_modules", "target", ".build", "build", "dist", "Pods", ".gradle"}
+
+
+def project_dir_names(root: Path, exclude: list[str] | tuple[str, ...] = ()) -> frozenset[str]:
+    """Every directory name under root (build output and VCS pruned)."""
+    import os
+    skip = _NEVER_LOCAL | set(exclude)
+    names: set[str] = set()
+    for _dirpath, dirnames, _files in os.walk(root):
+        dirnames[:] = [d for d in dirnames if d not in skip]
+        names.update(dirnames)
+    return frozenset(names)
+
+
+def resolve_source_root(root: Path, source_root: str) -> Path | None:
+    """root/source_root if it is a directory. A `*` in a segment is a glob (first match in sorted
+    order), so "*-ios/Sources" finds the sources of a project renamed from arcana-ios."""
+    if "*" not in source_root:
+        cand = root / source_root
+        return cand if cand.exists() else None
+    for cand in sorted(root.glob(source_root)):
+        if cand.is_dir():
+            return cand
+    return None
 
 
 @dataclass
@@ -16,10 +76,13 @@ class LayerDef:
     # MenuRegistry trait. A source *file* never ends in a bare item name, so files keep their
     # crate's layer; only imports of the listed items are reclassified.
     items: list[str] = field(default_factory=list)
+    # Directory names of the scanned project, set by FrameworkProfile.bind_project. None = unknown
+    # (a profile used outside a scan): globbed segments then match any name.
+    local_dirs: frozenset[str] | None = None
 
     def matches(self, rel_path: str) -> bool:
         probe = "/" + rel_path
-        if not any("/" + p in probe for p in self.paths):
+        if not any(path_matches(probe, p, self.local_dirs) for p in self.paths):
             return False
         return not self.items or probe.rstrip("/").rsplit("/", 1)[-1] in self.items
 
@@ -71,6 +134,16 @@ class FrameworkProfile:
                     part in self.exclude_dirs for part in f.relative_to(root).parts[:-1]):
                 continue
             yield f
+
+    def bind_project(self, root: Path) -> None:
+        """Tell glob layer paths ("*-rest/") which directory names are the project's own. Only
+        walks the tree when some layer path actually globs."""
+        layers = self.layers + self.fallback_layers
+        if not any("*" in p for l in layers for p in l.paths):
+            return
+        names = project_dir_names(root, self.exclude_dirs)
+        for l in layers:
+            l.local_dirs = names
 
     def get_layer_order(self) -> list[str]:
         return [l.name for l in self.layers]

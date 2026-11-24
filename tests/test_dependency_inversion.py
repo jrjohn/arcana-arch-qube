@@ -79,8 +79,12 @@ def test_no_bundled_profile_turns_dependency_inversion_on_silently():
         assert load_profile(PROFILES, f.stem).dip_ports == [], f.stem
 
 
-def test_layer_paths_match_whole_directory_names():
+def test_layer_paths_match_whole_directory_names(tmp_path):
     ios = load_profile(PROFILES, "ios")
+    # Glob layer paths ("*Data/") only take the project's own directories, which a scan binds.
+    for d in ("ArcanaData", "Sources/Data"):
+        (tmp_path / d).mkdir(parents=True)
+    ios.bind_project(tmp_path)
     assert ios.classify_specific("SwiftData") is None          # Apple framework, not Data/
     assert ios.classify_specific("ArcanaData/Repo.swift") == "data"
     assert ios.classify_specific("Sources/Data/Repo.swift") == "data"

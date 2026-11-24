@@ -2,7 +2,7 @@ framework: windows
 platform: desktop
 category: client
 
-source_roots: ["src", "ArcanaWindows"]
+source_roots: ["src", "*Windows"]
 file_extensions: [".cs"]
 
 layers:

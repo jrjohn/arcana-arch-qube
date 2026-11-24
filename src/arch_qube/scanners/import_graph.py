@@ -389,12 +389,15 @@ def _is_test_file(filename: str) -> bool:
     return any(p in lower for p in (".spec.", ".test.", "_test.", "_spec.", "mock.", "stub.", "fixture."))
 
 
+from fnmatch import fnmatchcase
+
+
 def _find_source_root(fpath: Path, source_root_pattern: str) -> Path | None:
     """Find the source root directory by walking up from file."""
     current = fpath.parent
     target = source_root_pattern.rstrip("/").split("/")[-1]
     while current != current.parent:
-        if current.name == target:
+        if current.name == target or ("*" in target and fnmatchcase(current.name, target)):
             return current
         current = current.parent
     return None

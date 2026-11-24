@@ -8,7 +8,7 @@ from rich.console import Console
 from rich.table import Table
 
 from arch_qube.rules.loader import load_rules
-from arch_qube.profiles.loader import load_profile
+from arch_qube.profiles.loader import load_profile, resolve_source_root
 from arch_qube.scanner import run_ast_scan
 from arch_qube.scoring.engine import build_report
 from arch_qube.reporters.json_reporter import generate_json
@@ -128,8 +128,8 @@ def scan(
     # Determine effective source root
     effective_root = source_root
     for sr in profile.source_roots:
-        candidate = source_root / sr
-        if candidate.exists():
+        candidate = resolve_source_root(source_root, sr)
+        if candidate is not None:
             effective_root = candidate
             break
 
