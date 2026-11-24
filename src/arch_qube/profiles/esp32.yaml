@@ -20,12 +20,20 @@ layers:
 allowed_dependencies:
   service: [driver, observable, core]
   driver: [observable, core]
+  # Observable<T> lives in main/share/core/event/ (arcana-embedded-esp32 AGENTS.md: Core =
+  # "Observable<T>, value types"); "observable" is only split out as its own shared layer, so
+  # core code (views, value types) including it is core -> core. Invisible while main/** made
+  # every file a DI container.
+  core: [observable]
 
 import_pattern: "#include\\s+[\"<]([^\"'>]+)[\"'>]"
 
+# Composition root ONLY (arcana-embedded-esp32 AGENTS.md R2: only AppContainer / App.cpp may
+# include *Impl.hpp). This list used to also hold "main/**" -- every ESP-IDF source lives under
+# main/, so every file was a "DI container" -- and "**/*Impl.cpp", which exempted every
+# implementation. Rule 03 could not report anything. An Impl including its OWN header is allowed
+# by the check itself (_is_own_declaration), not by exempting all Impl files.
 di_container_files:
-  - "**/AppContainer*"
-  - "**/Controller*"
-  - "**/app_main*"
-  - "main/**"
-  - "**/*Impl.cpp"
+  - "**/AppContainer.*"
+  - "**/App.cpp"
+  - "**/app_main.*"
