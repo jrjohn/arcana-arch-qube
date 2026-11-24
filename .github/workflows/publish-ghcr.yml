@@ -1,0 +1,80 @@
+name: publish-ghcr
+
+# Publish the arch-qube image to GitHub Container Registry as a mirror of arcana.boo, so template
+# repos' tools/arch-check.sh keep working when the self-hosted registry is down (2026-11-23: bluesea
+# went offline and every arch-check in the fleet stopped).
+#
+# Called by release-please.yml right after a release is cut. It cannot be triggered by `on: release`:
+# release-please creates the release with GITHUB_TOKEN, and events made with GITHUB_TOKEN never start
+# another workflow run. workflow_dispatch backfills an existing tag (e.g. the first publish of 0.5.5).
+#
+# Multi-arch (amd64 + arm64): template users build on x86 Windows/Linux and on Apple Silicon.
+# ghcr.io keeps the image index intact (the single-manifest rule in build-and-push.sh exists only
+# because the private registry's nightly GC strips untagged index children).
+#
+# After the FIRST publish, make the package public once: github.com/users/jrjohn/packages/container/
+# arch-qube/settings → Change visibility → Public. Public packages are free (no storage/bandwidth bill).
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v0.5.5"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, e.g. v0.5.5"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/${{ github.repository_owner }}/arch-qube
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Version from tag
+        id: v
+        run: |
+          tag="${{ inputs.tag }}"
+          case "$tag" in v[0-9]*) ;; *) echo "tag must look like v1.2.3, got: $tag" >&2; exit 1 ;; esac
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          provenance: false
+          sbom: false
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.v.outputs.version }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.v.outputs.version }}
+            org.opencontainers.image.description=Architecture Qube — layered-architecture quality gate
+
+      - name: Smoke test the pushed image
+        run: |
+          docker run --rm "${IMAGE}:${{ steps.v.outputs.version }}" --help | head -5
