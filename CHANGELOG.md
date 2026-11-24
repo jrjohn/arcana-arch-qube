@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.5](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.4...v0.5.5) (2026-11-24)
+
+
+### Bug Fixes
+
+* **client:** 扁平的 web/mobile/desktop 專案判未分層,不再白送分數 ([#23](https://github.com/jrjohn/arcana-arch-qube/issues/23)) ([b6cb222](https://github.com/jrjohn/arcana-arch-qube/commit/b6cb22240bbe1befdb3ba3385d0a804e710f148a))
+* **profiles:** 層靠角色後綴辨識,不靠範本的 arcana- 字面名稱 ([#24](https://github.com/jrjohn/arcana-arch-qube/issues/24)) ([d9b90aa](https://github.com/jrjohn/arcana-arch-qube/commit/d9b90aaf9a29d93c57dd093fd412ae23bf0f7ddf))
+
 ## [0.5.4](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.3...v0.5.4) (2026-11-23)
 
 
