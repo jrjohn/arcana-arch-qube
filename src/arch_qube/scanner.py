@@ -112,6 +112,7 @@ def run_ast_scan(
 ) -> list[RuleResult]:
     """Run all AST-based checks and return results per rule."""
     results: list[RuleResult] = []
+    profile.bind_project(project_root or source_root)
 
     # Count source files
     file_count = sum(

@@ -2,18 +2,18 @@ framework: ios
 platform: mobile
 category: client
 
-source_roots: ["Sources", "arcana-ios/Sources"]
+source_roots: ["Sources", "*-ios/Sources"]
 file_extensions: [".swift"]
 
 layers:
   - name: presentation
-    paths: ["Presentation/", "ArcanaPresentation/"]
+    paths: ["Presentation/", "*Presentation/"]
   - name: domain
-    paths: ["Domain/", "ArcanaDomain/"]
+    paths: ["Domain/", "*Domain/"]
   - name: data
-    paths: ["Data/", "ArcanaData/"]
+    paths: ["Data/", "*Data/"]
   - name: core
-    paths: ["Core/", "ArcanaCore/"]
+    paths: ["Core/", "*Core/"]
     is_shared: true
 
 allowed_dependencies:
