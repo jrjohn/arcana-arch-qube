@@ -27,6 +27,11 @@ permissions:
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    # A release can be cut by either run: the first (release PR merged by hand) or the second
+    # (after "Merge the release PR" below). The ghcr job publishes whichever produced the tag.
+    outputs:
+      released: ${{ steps.rp.outputs.release_created || steps.rp2.outputs.release_created }}
+      tag: ${{ steps.rp.outputs.tag_name || steps.rp2.outputs.tag_name }}
     steps:
       - id: rp
         uses: googleapis/release-please-action@v5
@@ -46,7 +51,20 @@ jobs:
           gh pr merge "${{ fromJSON(steps.rp.outputs.pr).number }}" --squash --delete-branch -R "${{ github.repository }}"
           sleep 5
       - name: Tag and publish the release
+        id: rp2
         if: ${{ steps.rp.outputs.pr }}
         uses: googleapis/release-please-action@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Mirror the released image to ghcr.io. Called from here because a release created with
+  # GITHUB_TOKEN never triggers an `on: release` workflow (see publish-ghcr.yml).
+  publish-ghcr:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.released == 'true' }}
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/publish-ghcr.yml
+    with:
+      tag: ${{ needs.release-please.outputs.tag }}
