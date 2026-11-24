@@ -100,6 +100,54 @@ def check_layer_direction(
     return violations
 
 
+def _names_impl(target: str) -> bool:
+    """Does the import name an implementation (FooImpl, impl/foo, foo.impl.ts)?"""
+    t = target.replace("\\", "/").lower().rstrip("/")
+    segs = t.split("/")
+    if len(segs) > 1 and segs[-1] in _EXTS:
+        segs = segs[:-1]  # C/C++ include "impl/FooImpl.hpp" arrives as impl/FooImpl/hpp
+    return "impl" in segs[:-1] or _named_impl(t)
+
+
+def _named_impl(path: str) -> bool:
+    """The imported unit itself is an implementation by NAME (FooImpl, foo_impl, foo.impl.ts),
+    as opposed to merely living in an impl/ directory."""
+    t = path.replace("\\", "/").lower().rstrip("/")
+    segs = t.split("/")
+    if len(segs) > 1 and segs[-1] in _EXTS:
+        segs = segs[:-1]
+    last = segs[-1]
+    head, dot, ext = last.rpartition(".")
+    if dot and ext in _EXTS:
+        last = head
+    return last.endswith("impl") or ".impl." in last + "."
+
+
+def _in_impl_dir(path: str) -> bool:
+    return "impl" in path.replace("\\", "/").lower().split("/")[:-1]
+
+
+_EXTS = {"hpp", "hh", "hxx", "h", "cpp", "cc", "cxx", "c", "ts", "tsx", "js", "mjs", "ets",
+         "kt", "java", "swift", "cs", "py", "rs", "go"}
+
+
+def _decl_stem(path: str) -> str:
+    """Stem of the last path element: FooServiceImpl.cpp, impl/FooServiceImpl.hpp and the
+    import-graph form impl/FooServiceImpl/hpp all give 'fooserviceimpl'."""
+    segs = path.replace("\\", "/").lower().rstrip("/").split("/")
+    if len(segs) > 1 and segs[-1] in _EXTS:
+        return segs[-2]
+    name = segs[-1]
+    head, dot, ext = name.rpartition(".")
+    return head if dot and ext in _EXTS else name
+
+
+def _is_own_declaration(source_file: str, target: str) -> bool:
+    """FooImpl.cpp including FooImpl.hpp (any directory) is the implementation's own header."""
+    src = _decl_stem(source_file)
+    return bool(src) and src == _decl_stem(target)
+
+
 def check_impl_import_restriction(
     edges: list[ImportEdge],
     profile: FrameworkProfile,
@@ -108,23 +156,24 @@ def check_impl_import_restriction(
     violations: list[Violation] = []
 
     for edge in edges:
-        # Check if the import target looks like an Impl file
-        target_lower = edge.target_import.lower()
-        is_impl = (
-            "impl/" in target_lower
-            or target_lower.endswith("impl")
-            or ".impl." in target_lower
-            or "impl." in target_lower.split("/")[-1] if "/" in target_lower else False
-        )
-        if not is_impl:
+        if not _names_impl(edge.target_import):
             continue
 
-        # Check if the source file is a DI container
+        # The composition root is the one place allowed to wire implementations.
         if profile.is_di_container(edge.source_file):
             continue
 
-        # Also allow impl files importing from their own impl/ directory
-        if edge.source_layer and "impl" in edge.source_file.lower():
+        # An implementation may include its OWN header/declaration (FooImpl.cpp ->
+        # impl/FooImpl.hpp), never another implementation. Until 2026-11-24 any source file
+        # with "impl" in its path was exempt wholesale, so FooImpl including BarImpl -- the
+        # exact coupling this rule exists to catch -- was never reported.
+        if _is_own_declaration(edge.source_file, edge.target_import):
+            continue
+
+        # An implementation's private helpers (impl/mongo/document, impl/mybatis/mapper, a
+        # library's org.quartz.impl.matchers) are not other implementations: only an import
+        # NAMED *Impl counts when the importer is itself inside an impl/ package.
+        if _in_impl_dir(edge.source_file) and not _named_impl(edge.target_import):
             continue
 
         violations.append(Violation(
