@@ -70,12 +70,13 @@ def chain_layers(profile: FrameworkProfile) -> tuple[str, ...]:
     Backend: the controller/service/repository/dao chain. Embedded: the profile's own non-shared
     layers (esp32: service, driver) -- everything else in main/ is the shared core layer, so a
     flat main/*.c firmware classifies every file as core and used to pass every layer rule
-    (2026-11-23: iNAPLink, 5,900 lines of flat C, 90/100). Other clients: not judged here."""
+    (2026-11-23: iNAPLink, 5,900 lines of flat C, 90/100). Clients (web/mobile/desktop): likewise
+    the profile's non-shared layers -- presentation/domain/data for the MVVM clients, the
+    view/viewmodel/service/repository/... chain for rust-desktop. A flat client puts every file in
+    the shared core layer (or none) and used to get every layer rule for free."""
     if profile.category == "backend":
         return _BACKEND_CHAIN
-    if profile.platform == "embedded":
-        return tuple(l.name for l in profile.layers if not l.is_shared)
-    return ()
+    return tuple(l.name for l in profile.layers if not l.is_shared)
 
 
 def detected_backend_layers(source_root: Path, profile: FrameworkProfile) -> set[str]:
@@ -99,6 +100,7 @@ def is_unlayered(source_root: Path, profile: FrameworkProfile) -> bool:
 def unlayered_host_check(profile: FrameworkProfile) -> str:
     """The check that reports "unlayered" and scores its rule 0. Backend: rule #16's
     layer_dirs_exist. Embedded has no rule #16, so the common layer-direction rule carries it --
+    Clients likewise (their rule #16 is backend-only) --
     otherwise every layer rule would be NOT EVALUATED and a flat project would score higher
     than a layered one with a single violation."""
     return "layer_dirs_exist" if profile.category == "backend" else "no_upward_imports"
