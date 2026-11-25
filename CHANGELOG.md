@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.7](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.6...v0.5.7) (2026-11-25)
+
+
+### Bug Fixes
+
+* rule03 DI 範圍收斂到組裝根、--ci 失敗印原因、--version 真實版本 ([#30](https://github.com/jrjohn/arcana-arch-qube/issues/30)) ([5ba1fde](https://github.com/jrjohn/arcana-arch-qube/commit/5ba1fdebaf9362a8918e83733bcd47e85ad74243))
+
 ## [0.5.6](https://github.com/jrjohn/arcana-arch-qube/compare/v0.5.5...v0.5.6) (2026-11-24)
 
 
