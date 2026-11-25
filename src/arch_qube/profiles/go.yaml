@@ -34,11 +34,17 @@ allowed_dependencies:
 
 import_pattern: "\"([^\"]+)\""
 
+# Rule #3 (Only DI Container Imports Impl): ONLY the template's composition root. Every entry here
+# is a place an Impl import is never reported, so a broad glob silently scores the rule 100
+# (0.5.7: same defect as esp32 main/**, #27).
 di_container_files:
   - "di/**"
   - "cmd/**"
   - "**/wire.go"
   - "**/container.go"
+# wiring_files: skipped by the layer-direction / boundary / impl-location checks as before 0.5.7,
+# but NOT by rule #3 -- an Impl import here is reported.
+wiring_files:
   - "**/grpc/**"
   - "**/proto/**"
 

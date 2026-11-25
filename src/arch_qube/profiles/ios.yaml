@@ -23,7 +23,12 @@ allowed_dependencies:
 
 import_pattern: "import\\s+(\\w+)"
 
+# Rule #3 (Only DI Container Imports Impl): ONLY the template's composition root. Every entry here
+# is a place an Impl import is never reported, so a broad glob silently scores the rule 100
+# (0.5.7: same defect as esp32 main/**, #27).
+# Swift has no per-file imports: rule #3 scans for *Impl type references instead.
 di_container_files:
+  - "**/DI/AppDependencies.swift"   # the template composition root (ArcanaCore/DI/)
   - "**/Dependencies.swift"
   - "**/DependencyValues+*.swift"
   - "**/ServiceModule.swift"

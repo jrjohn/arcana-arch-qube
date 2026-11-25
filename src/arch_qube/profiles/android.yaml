@@ -23,9 +23,15 @@ allowed_dependencies:
 
 import_pattern: "^import\\s+([a-zA-Z0-9_.]+)"
 
+# Rule #3 (Only DI Container Imports Impl): ONLY the template's composition root. Every entry here
+# is a place an Impl import is never reported, so a broad glob silently scores the rule 100
+# (0.5.7: same defect as esp32 main/**, #27).
 di_container_files:
+  - "**/di/**"              # Hilt modules: com/example/arcana/di/*Module.kt
+# wiring_files: skipped by the layer-direction / boundary / impl-location checks as before 0.5.7,
+# but NOT by rule #3 -- an Impl import here is reported.
+wiring_files:
   - "core/**"
-  - "**/di/**"
   - "**/*Module.kt"
   - "**/hilt/**"
   - "data/worker/**"

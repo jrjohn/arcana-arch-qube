@@ -1,5 +1,7 @@
 """JSON report generator."""
 from __future__ import annotations
+
+from arch_qube import package_version
 import json
 from datetime import datetime, timezone
 from arch_qube.rules.models import ScanReport
@@ -10,7 +12,7 @@ def generate_json(report: ScanReport) -> str:
     data = {
         "meta": {
             "tool": "arch-qube",
-            "version": "0.1.0",
+            "version": package_version(),
             "framework": report.framework,
             "scan_date": datetime.now(timezone.utc).isoformat(),
             "source_root": report.source_root,

@@ -11,6 +11,7 @@ from arch_qube.scanners.import_graph import (
     build_import_graph,
     check_layer_direction,
     check_impl_import_restriction,
+    check_swift_impl_references,
 )
 from arch_qube.scanners.file_structure import (
     check_impl_colocation,
@@ -38,7 +39,10 @@ Handler = Callable[[ScanContext, AstCheck], "list[Violation] | None"]
 HANDLERS: dict[str, Handler] = {
     "no_upward_imports": lambda c, _: check_layer_direction(c.edges, c.profile),
     "no_skip_imports": lambda c, _: check_layer_direction(c.edges, c.profile),
-    "impl_import_only_di": lambda c, _: check_impl_import_restriction(c.edges, c.profile),
+    "impl_import_only_di": lambda c, _: (
+        check_impl_import_restriction(c.edges, c.profile)
+        + (check_swift_impl_references(c.source_root, c.profile)
+           if ".swift" in c.profile.file_extensions else [])),
     "impl_in_subdir": lambda c, _: check_impl_colocation(c.source_root, c.profile),
     "impl_naming_convention": lambda c, _: check_impl_naming(c.source_root, c.profile),
     "layer_dirs_exist": lambda c, _: check_layer_exists(c.source_root, c.profile),

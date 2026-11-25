@@ -40,9 +40,17 @@ import_pattern: "use\\s+(?:crate::)?([a-zA-Z0-9_:]+)"
 # None: 1,543 edges in Desktop KM, and layer-direction / repository-no-service checked nothing.
 import_resolver: rust_workspace
 
+# Rule #3 (Only DI Container Imports Impl): ONLY the template's composition root. Every entry here
+# is a place an Impl import is never reported, so a broad glob silently scores the rule 100
+# (0.5.7: same defect as esp32 main/**, #27).
+# lib.rs / mod.rs are not listed: `pub use r#impl::FooImpl;` re-exporting a child module is skipped
+# by the import parser itself, and any other use of an Impl there is a real violation.
 di_container_files:
   - "**/main.rs"
-  - "**/lib.rs"
   - "**/container.rs"
   - "**/di.rs"
+# wiring_files: skipped by the layer-direction / boundary / impl-location checks as before 0.5.7,
+# but NOT by rule #3 -- an Impl import here is reported.
+wiring_files:
+  - "**/lib.rs"
   - "**/mod.rs"

@@ -1,5 +1,7 @@
 """CLI entry point for arch-qube."""
 from __future__ import annotations
+
+from arch_qube import package_version
 import sys
 from pathlib import Path
 
@@ -53,7 +55,7 @@ def _find_data_dir(name: str) -> Path:
 
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version=package_version(), prog_name="arch-qube")
 def main():
     """Architecture Qube — AI-powered Architecture Quality Gate."""
     pass
@@ -70,7 +72,10 @@ def main():
 @click.option("--output", "-o", "output_dir", type=click.Path(), default="arch-qube-reports",
               help="Output directory")
 @click.option("--format", "formats", default="json,markdown", help="Output formats (comma-separated)")
-@click.option("--ci", is_flag=True, help="CI mode: exit 1 on fail, minimal output")
+@click.option("--ci", is_flag=True,
+              help="CI mode: exit 1 on fail; silent on PASS, prints a failure summary on FAIL")
+@click.option("--ci-max-locations", type=int, default=10, show_default=True,
+              help="With --ci: file:line entries listed per violated rule on FAIL")
 @click.option("--no-ai", is_flag=True, help="Skip AI semantic analysis")
 @click.option("--diff-only", is_flag=True, help="Only scan changed files (git diff)")
 @click.option("--base-branch", default="main", help="Base branch for diff (default: main)")
@@ -84,6 +89,7 @@ def scan(
     output_dir: str,
     formats: str,
     ci: bool,
+    ci_max_locations: int,
     no_ai: bool,
     diff_only: bool,
     base_branch: str,
@@ -225,7 +231,47 @@ def scan(
         if not ci:
             console.print(f"\n[red bold]FAIL[/red bold] — {report.total_score}/100 ({report.grade})")
             console.print(f"  Threshold: {threshold}, Violations: {report.total_violations}")
+        else:
+            # Until 0.5.7 a --ci FAIL printed nothing: the job went red and the log never said why.
+            click.echo(format_ci_failure(report, ci_max_locations), err=False)
         sys.exit(1)
+
+
+_SEVERITY_ORDER = {"critical": 0, "major": 1, "minor": 2, "info": 3}
+
+
+def format_ci_failure(report, max_locations: int = 10) -> str:
+    """Plain-text (no colour codes) summary of a failed scan for CI logs: score vs threshold, then
+    every violated rule — CRITICAL first, then by number of violations — with up to
+    ``max_locations`` file:line entries each."""
+    crit = [r for r in report.rule_results if r.violations and r.severity.value == "critical"]
+    lines = [
+        (f"arch-qube FAIL: {report.total_score}/100 ({report.grade}), threshold {report.threshold}, "
+         f"framework {report.framework}"),
+    ]
+    reasons = []
+    if report.total_score < report.threshold:
+        reasons.append(f"score {report.total_score} < threshold {report.threshold}")
+    if crit:
+        reasons.append(f"{len(crit)} critical rule(s) violated (any critical violation fails)")
+    if reasons:
+        lines.append("Reason: " + "; ".join(reasons))
+    violated = sorted(
+        (r for r in report.rule_results if r.violations),
+        key=lambda r: (_SEVERITY_ORDER.get(r.severity.value, 9), -len(r.violations), r.rule_id),
+    )
+    lines.append(f"Violated rules: {len(violated)}, violations: {report.total_violations}")
+    for r in violated:
+        lines.append(
+            f"[{r.severity.value.upper()}] {r.rule_name} ({r.rule_id}): "
+            f"{len(r.violations)} violation(s), compliance {r.compliance}%"
+        )
+        for v in r.violations[:max(0, max_locations)]:
+            lines.append(f"  {v.file}:{v.line}  {v.message}")
+        hidden = len(r.violations) - max(0, max_locations)
+        if hidden > 0:
+            lines.append(f"  ... and {hidden} more (see the json/markdown report)")
+    return "\n".join(lines)
 
 
 def _print_table(report):
