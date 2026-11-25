@@ -77,7 +77,7 @@ def check_layer_direction(
         if edge.source_layer == edge.target_layer:
             continue
         # DI container / wiring files can import from any layer
-        if profile.is_di_container(edge.source_file):
+        if profile.is_wiring_file(edge.source_file):
             continue
 
         if not profile.is_allowed_dependency(edge.source_layer, edge.target_layer):
@@ -387,8 +387,8 @@ def _parse_rust_imports(fpath: Path, root: Path, crates: dict[str, str]) -> list
                         base = base[:-1]
             elif head in crates:
                 base, rest = crates[head].split("/"), segs[1:]
-            elif ((root / "/".join(mod_dir) / f"{head}.rs").is_file()
-                  or (root / "/".join(mod_dir) / head).is_dir()):
+            elif ((root / "/".join(mod_dir) / f"{_raw_ident(head)}.rs").is_file()
+                  or (root / "/".join(mod_dir) / _raw_ident(head)).is_dir()):
                 if is_pub:
                     continue  # a module re-exporting its own child (`pub use view::show`) is structure
                 base, rest = list(mod_dir), segs  # a child module of this one (`use shell::Shell`)
@@ -396,6 +396,54 @@ def _parse_rust_imports(fpath: Path, root: Path, crates: dict[str, str]) -> list
                 out.append((i, path.lstrip(":")))
                 continue
             out.append((i, "/".join(base + rest)))
+    return out
+
+
+def _raw_ident(name: str) -> str:
+    """`r#impl` names the module file impl.rs (a raw identifier, since `impl` is a keyword).
+    Without this, `pub use r#impl::FooImpl;` in a lib.rs/mod.rs -- a module re-exporting its own
+    child -- looked like an import of someone else's Impl, which is why the rust profiles had to
+    list every lib.rs and mod.rs as a "DI container" (until 0.5.7)."""
+    return name.removeprefix("r#")
+
+
+_SWIFT_IMPL_REF = re.compile(r"\b([A-Z][A-Za-z0-9_]*Impl)\b")
+_SWIFT_DECL = re.compile(
+    r"\b(?:class|struct|actor|enum|extension|protocol|typealias)\s+([A-Z][A-Za-z0-9_]*Impl)\b")
+_SWIFT_STRIP = re.compile(r'//.*$|"(?:\\.|[^"\\])*"')
+
+
+def check_swift_impl_references(source_root: Path, profile: FrameworkProfile) -> list[Violation]:
+    """Rule #3 for Swift. A Swift target is one module: files never import each other, so the
+    import graph cannot see a view model using `OfflineFirstUserRepositoryImpl`. Until 0.5.7 the
+    rule still reported "evaluated, 100%" for ios. Here every reference to a type named *Impl
+    (construction, cast, annotation) outside the composition root and outside the file that
+    declares that type is a violation."""
+    out: list[Violation] = []
+    for fpath in profile.source_files(source_root, ".swift"):
+        if _is_test_file(fpath.name):
+            continue
+        rel = fpath.relative_to(source_root).as_posix()
+        if profile.is_di_container(rel) or "/tests/" in "/" + rel.lower():
+            continue
+        try:
+            text = fpath.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.DOTALL)
+        lines = [_SWIFT_STRIP.sub("", ln) for ln in text.splitlines()]
+        own = {m.group(1) for ln in lines for m in _SWIFT_DECL.finditer(ln)}
+        for i, ln in enumerate(lines, 1):
+            for name in dict.fromkeys(m.group(1) for m in _SWIFT_IMPL_REF.finditer(ln)):
+                if name in own:
+                    continue
+                out.append(Violation(
+                    file=rel, line=i,
+                    message=f"Non-DI file references implementation {name}",
+                    suggestion="Depend on the protocol; only the composition root (DI) may name "
+                               "a concrete *Impl.",
+                    check_type=CheckType.AST,
+                ))
     return out
 
 

@@ -48,7 +48,7 @@ def _layer_files(ctx, layers: set[str], skip_di: bool = True) -> Iterator[tuple[
     for ext in ctx.profile.file_extensions:
         for fpath in ctx.profile.source_files(ctx.source_root, ext):
             rel = str(fpath.relative_to(ctx.source_root))
-            if _is_test_path(rel) or (skip_di and ctx.profile.is_di_container(rel)):
+            if _is_test_path(rel) or (skip_di and ctx.profile.is_wiring_file(rel)):
                 continue
             if _content_layer(ctx.profile, rel) not in layers:
                 continue
@@ -108,7 +108,7 @@ def check_boundary_uses_dto(ctx, check) -> list[Violation]:
     boundary = _boundary_layers(ctx)
     out = []
     for e in ctx.edges:
-        if e.source_layer not in boundary or ctx.profile.is_di_container(e.source_file):
+        if e.source_layer not in boundary or ctx.profile.is_wiring_file(e.source_file):
             continue
         if _ENTITY_TARGET.search(e.target_import):
             out.append(_v(e.source_file, e.line,
@@ -422,7 +422,7 @@ _CROSS_CUTTING = re.compile(r"i18n|l10n|translat|locale|locali[sz]ation|nav(igat
 def check_view_no_service_import(ctx, check) -> list[Violation]:
     out = []
     for e in ctx.edges:
-        if e.source_layer not in ("presentation", "view") or ctx.profile.is_di_container(e.source_file):
+        if e.source_layer not in ("presentation", "view") or ctx.profile.is_wiring_file(e.source_file):
             continue
         if _VIEWMODEL_FILE.search("/" + e.source_file):
             continue

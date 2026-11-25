@@ -98,6 +98,7 @@ class FrameworkProfile:
     file_extensions: list[str]
     import_pattern: str  # regex for static imports
     di_container_files: list[str] = field(default_factory=list)
+    wiring_files: list[str] = field(default_factory=list)
     naming: dict[str, str] = field(default_factory=dict)
     # Dependency inversion (Fowler, PresentationDomainDataLayering: "arrange things so that the
     # domain does not depend on its data sources by introducing a mapper" / Hexagonal). Layers
@@ -181,22 +182,14 @@ class FrameworkProfile:
         return self.classify_file(rel_path) or self.classify_file(rel_path.rstrip("/") + "/")
 
     def is_di_container(self, rel_path: str) -> bool:
-        """Check if file is a DI container / module file."""
-        from pathlib import PurePosixPath
-        from fnmatch import fnmatch
-        p = PurePosixPath(rel_path)
-        for pat in self.di_container_files:
-            # PurePath.match supports ** glob patterns
-            if p.match(pat):
-                return True
-            # fnmatch on full path (handles **/ as wildcard prefix)
-            if fnmatch(rel_path, pat.replace("**/", "*")):
-                return True
-            # Check basename match for patterns like "*Impl.cpp", "*Config.java"
-            pat_name = pat.rsplit("/", 1)[-1] if "/" in pat else pat
-            if pat_name != "**" and "*" in pat_name and fnmatch(p.name, pat_name):
-                return True
-        return False
+        """The composition root: the only files that may import / name a concrete *Impl (rule #3)."""
+        return _matches_any(rel_path, self.di_container_files)
+
+    def is_wiring_file(self, rel_path: str) -> bool:
+        """Composition root plus ``wiring_files``: files the layer-direction, boundary and
+        impl-location checks skip. Rule #3 does NOT use this -- until 0.5.7 those extra globs sat
+        in di_container_files and so silently exempted whole layers from rule #3 as well."""
+        return self.is_di_container(rel_path) or _matches_any(rel_path, self.wiring_files)
 
     def is_allowed_dependency(self, from_layer: str, to_layer: str) -> bool:
         allowed = self.allowed_dependencies.get(from_layer, [])
@@ -230,6 +223,7 @@ def load_profile(profiles_dir: Path, framework: str) -> FrameworkProfile:
         file_extensions=data.get("file_extensions", [".ts"]),
         import_pattern=data.get("import_pattern", r"import .* from ['\"](.+?)['\"]"),
         di_container_files=data.get("di_container_files", []),
+        wiring_files=data.get("wiring_files", []),
         naming=data.get("naming", {}),
         dip_ports=(data.get("dependency_inversion") or {}).get("ports", []),
         module_roots=(data.get("modules") or {}).get("roots", []),
@@ -288,3 +282,21 @@ def apply_project_layers(profile: FrameworkProfile, config: Path) -> dict[str, l
         profile.dip_ports = list(dip)
         applied["dip_ports"] = list(dip)
     return applied
+
+
+def _matches_any(rel_path: str, patterns: list[str]) -> bool:
+    from pathlib import PurePosixPath
+    from fnmatch import fnmatch
+    p = PurePosixPath(rel_path)
+    for pat in patterns:
+        # PurePath.match supports ** glob patterns
+        if p.match(pat):
+            return True
+        # fnmatch on full path (handles **/ as wildcard prefix)
+        if fnmatch(rel_path, pat.replace("**/", "*")):
+            return True
+        # Check basename match for patterns like "*Impl.cpp", "*Config.java"
+        pat_name = pat.rsplit("/", 1)[-1] if "/" in pat else pat
+        if pat_name != "**" and "*" in pat_name and fnmatch(p.name, pat_name):
+            return True
+    return False
