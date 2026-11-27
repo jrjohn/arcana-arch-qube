@@ -1,9 +1,9 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/Architecture_Qube-AI--powered-gold?style=for-the-badge" alt="Architecture Qube">
-  <img src="https://img.shields.io/badge/Rules-21-blue?style=for-the-badge" alt="Rules">
-  <img src="https://img.shields.io/badge/Profiles-14-blue?style=for-the-badge" alt="Profiles">
-  <img src="https://img.shields.io/badge/Tests-19_passing-brightgreen?style=for-the-badge" alt="Tests">
-  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License">
+  <img src=".github/badges/architecture-qube-ai-powered-gold-f05748ed.svg" alt="Architecture Qube">
+  <img src=".github/badges/rules-21-blue-91c5e8b8.svg" alt="Rules">
+  <img src=".github/badges/profiles-14-blue-c608af55.svg" alt="Profiles">
+  <img src=".github/badges/tests-19-passing-brightgreen-cb763307.svg" alt="Tests">
+  <img src=".github/badges/license-mit-green-544c7119.svg" alt="License">
 </p>
 
 <h1 align="center">Architecture Qube</h1>
